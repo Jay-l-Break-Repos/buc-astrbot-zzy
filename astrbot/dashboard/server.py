@@ -61,6 +61,13 @@ class AstrBotDashboard:
             methods=["GET", "POST"],
         )
 
+        # Public health-check / API root endpoint
+        self.app.add_url_rule(
+            "/api",
+            view_func=self.api_root,
+            methods=["GET"],
+        )
+
         self.shutdown_event = shutdown_event
 
     async def srv_plug_route(self, subpath, *args, **kwargs):
@@ -74,9 +81,19 @@ class AstrBotDashboard:
                 return await view_handler(*args, **kwargs)
         return jsonify(Response().error("未找到该路由").__dict__)
 
+    async def api_root(self):
+        """Public health-check endpoint at GET /api."""
+        from astrbot.core.config.default import VERSION
+        return jsonify({"status": "ok", "version": VERSION})
+
     async def auth_middleware(self):
         if not request.path.startswith("/api"):
             return
+        # Exact-match public endpoints (no auth required)
+        allowed_exact = ["/api"]
+        if request.path in allowed_exact:
+            return
+        # Prefix-match public endpoints (no auth required)
         allowed_endpoints = ["/api/auth/login", "/api/file", "/api/templates"]
         if any(request.path.startswith(prefix) for prefix in allowed_endpoints):
             return
