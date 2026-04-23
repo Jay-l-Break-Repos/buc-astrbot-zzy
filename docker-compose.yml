@@ -17,6 +17,14 @@ services:
             && cd /app/data && unzip -q dashboard.zip && rm dashboard.zip
         # Copy workspace overrides on top of the cloned AstrBot source
         COPY astrbot/ /app/astrbot/
+        COPY dashboard/ /app/dashboard/
+        # Rebuild the dashboard with our changes
+        RUN apt-get update -qq && apt-get install -y --no-install-recommends nodejs npm && rm -rf /var/lib/apt/lists/*
+        WORKDIR /app/dashboard
+        RUN npm install --legacy-peer-deps
+        RUN npx vite build
+        RUN rm -rf /app/data/dist && cp -r /app/dashboard/dist /app/data/dist
+        WORKDIR /app
         EXPOSE 6185
         CMD ["python", "main.py"]
     ports:
