@@ -1,17 +1,17 @@
 """Dashboard API routes for Notification Template CRUD operations.
 
-Endpoints (all prefixed with /api):
-    POST   /api/templates              – create a new template (201)
-    GET    /api/templates              – list all templates
-    GET    /api/templates/<id>         – get a single template by id
-    PUT    /api/templates/<id>         – update an existing template
-    DELETE /api/templates/<id>         – delete a template
+Endpoints (all prefixed with /api by register_routes()):
+    POST   /api/notification_template/create          – create a new template
+    GET    /api/notification_template/list            – list all templates
+    GET    /api/notification_template/detail          – get one template (?id=<id>)
+    POST   /api/notification_template/update          – update an existing template
+    POST   /api/notification_template/delete          – delete a template
 """
 
 import traceback
 from .route import Route, Response, RouteContext
 from astrbot.core import logger
-from quart import request, jsonify
+from quart import request
 from astrbot.core.db import BaseDatabase
 
 
@@ -21,17 +21,14 @@ class NotificationTemplateRoute(Route):
     def __init__(self, context: RouteContext, db_helper: BaseDatabase) -> None:
         super().__init__(context)
         self.db_helper = db_helper
-
-        self.app.add_url_rule(
-            "/api/templates",
-            view_func=self.templates_collection,
-            methods=["GET", "POST"],
-        )
-        self.app.add_url_rule(
-            "/api/templates/<int:template_id>",
-            view_func=self.templates_item,
-            methods=["GET", "PUT", "DELETE"],
-        )
+        self.routes = {
+            "/notification_template/create": ("POST", self.create_template),
+            "/notification_template/list": ("GET", self.list_templates),
+            "/notification_template/detail": ("GET", self.get_template),
+            "/notification_template/update": ("POST", self.update_template),
+            "/notification_template/delete": ("POST", self.delete_template),
+        }
+        self.register_routes()
 
     # ------------------------------------------------------------------
     # Helpers
@@ -48,24 +45,12 @@ class NotificationTemplateRoute(Route):
             "updated_at": tpl.updated_at,
         }
 
-    @staticmethod
-    def _json_response(data, status_code: int = 200):
-        """Return a Quart JSON response with the given status code."""
-        resp = jsonify(data)
-        resp.status_code = status_code
-        return resp
-
     # ------------------------------------------------------------------
-    # Collection endpoint: GET /api/templates  &  POST /api/templates
+    # POST /api/notification_template/create
     # ------------------------------------------------------------------
 
-    async def templates_collection(self):
-        if request.method == "GET":
-            return await self._list_templates()
-        return await self._create_template()
-
-    async def _create_template(self):
-        """POST /api/templates
+    async def create_template(self):
+        """Create a new notification template.
 
         Request body (JSON):
             {
@@ -73,139 +58,159 @@ class NotificationTemplateRoute(Route):
                 "body": "<template body with {{ placeholders }}>"
             }
 
-        Response (201):
-            { "id": ..., "name": ..., "body": ..., "created_at": ..., "updated_at": ... }
+        Response:
+            { "status": "ok", "data": { <template fields> } }
         """
         try:
             data = await request.get_json()
             if not data:
-                return self._json_response({"error": "请求体不能为空"}, 400)
+                return Response().error("请求体不能为空").__dict__
 
             name = (data.get("name") or "").strip()
             body = data.get("body")
 
             if not name:
-                return self._json_response({"error": "缺少必要参数: name"}, 400)
+                return Response().error("缺少必要参数: name").__dict__
             if body is None or body == "":
-                return self._json_response({"error": "缺少必要参数: body"}, 400)
+                return Response().error("缺少必要参数: body").__dict__
 
             template = self.db_helper.create_notification_template(name=name, body=body)
-            return self._json_response(self._template_to_dict(template), 201)
+            return Response().ok(self._template_to_dict(template)).__dict__
 
         except ValueError as e:
             # Duplicate name
-            return self._json_response({"error": str(e)}, 409)
+            return Response().error(str(e)).__dict__
         except Exception as e:
             logger.error(f"创建通知模板失败: {e}\n{traceback.format_exc()}")
-            return self._json_response({"error": f"创建通知模板失败: {e}"}, 500)
+            return Response().error(f"创建通知模板失败: {e}").__dict__
 
-    async def _list_templates(self):
-        """GET /api/templates
+    # ------------------------------------------------------------------
+    # GET /api/notification_template/list
+    # ------------------------------------------------------------------
 
-        Returns all templates ordered by creation time (ascending).
+    async def list_templates(self):
+        """Return all notification templates ordered by creation time (ascending).
 
-        Response (200):
-            [ { "id": ..., "name": ..., "body": ..., ... }, ... ]
+        Response:
+            { "status": "ok", "data": { "templates": [ ... ] } }
         """
         try:
             templates = self.db_helper.get_notification_templates()
-            return self._json_response(
-                [self._template_to_dict(t) for t in templates], 200
-            )
+            return Response().ok(
+                {"templates": [self._template_to_dict(t) for t in templates]}
+            ).__dict__
         except Exception as e:
             logger.error(f"获取通知模板列表失败: {e}\n{traceback.format_exc()}")
-            return self._json_response({"error": f"获取通知模板列表失败: {e}"}, 500)
+            return Response().error(f"获取通知模板列表失败: {e}").__dict__
 
     # ------------------------------------------------------------------
-    # Item endpoint: GET/PUT/DELETE /api/templates/<id>
+    # GET /api/notification_template/detail?id=<id>
     # ------------------------------------------------------------------
 
-    async def templates_item(self, template_id: int):
-        if request.method == "GET":
-            return await self._get_template(template_id)
-        if request.method == "PUT":
-            return await self._update_template(template_id)
-        return await self._delete_template(template_id)
+    async def get_template(self):
+        """Fetch a single notification template by its ID.
 
-    async def _get_template(self, template_id: int):
-        """GET /api/templates/<id>
+        Query parameter:
+            id (int): the template primary key
 
-        Response (200):
-            { "id": ..., "name": ..., "body": ..., "created_at": ..., "updated_at": ... }
+        Response:
+            { "status": "ok", "data": { <template fields> } }
         """
         try:
+            template_id = request.args.get("id", type=int)
+            if template_id is None:
+                return Response().error("缺少必要参数: id").__dict__
+
             template = self.db_helper.get_notification_template_by_id(template_id)
             if template is None:
-                return self._json_response(
-                    {"error": f"通知模板 (id={template_id}) 不存在"}, 404
-                )
-            return self._json_response(self._template_to_dict(template), 200)
+                return Response().error(f"通知模板 (id={template_id}) 不存在").__dict__
+
+            return Response().ok(self._template_to_dict(template)).__dict__
         except Exception as e:
             logger.error(f"获取通知模板详情失败: {e}\n{traceback.format_exc()}")
-            return self._json_response({"error": f"获取通知模板详情失败: {e}"}, 500)
+            return Response().error(f"获取通知模板详情失败: {e}").__dict__
 
-    async def _update_template(self, template_id: int):
-        """PUT /api/templates/<id>
+    # ------------------------------------------------------------------
+    # POST /api/notification_template/update
+    # ------------------------------------------------------------------
+
+    async def update_template(self):
+        """Update an existing notification template's name and/or body.
 
         Request body (JSON):
             {
-                "name": "<new name>",   // optional
-                "body": "<new body>"    // optional
+                "id":   <int>,           // required
+                "name": "<new name>",    // optional
+                "body": "<new body>"     // optional
             }
 
-        At least one of ``name`` or ``body`` must be provided.
+        At least one of ``name`` or ``body`` must be provided alongside ``id``.
 
-        Response (200):
-            { "id": ..., "name": ..., "body": ..., "created_at": ..., "updated_at": ... }
+        Response:
+            { "status": "ok", "data": { <updated template fields> } }
         """
         try:
             data = await request.get_json()
             if not data:
-                return self._json_response({"error": "请求体不能为空"}, 400)
+                return Response().error("请求体不能为空").__dict__
+
+            template_id = data.get("id")
+            if template_id is None:
+                return Response().error("缺少必要参数: id").__dict__
 
             name = data.get("name")
             body = data.get("body")
 
             if name is None and body is None:
-                return self._json_response(
-                    {"error": "至少需要提供 name 或 body 中的一个字段"}, 400
-                )
+                return Response().error("至少需要提供 name 或 body 中的一个字段").__dict__
 
             if name is not None:
                 name = name.strip()
                 if not name:
-                    return self._json_response({"error": "name 不能为空字符串"}, 400)
+                    return Response().error("name 不能为空字符串").__dict__
 
             updated = self.db_helper.update_notification_template(
-                template_id=template_id, name=name, body=body
+                template_id=int(template_id), name=name, body=body
             )
             if updated is None:
-                return self._json_response(
-                    {"error": f"通知模板 (id={template_id}) 不存在"}, 404
-                )
-            return self._json_response(self._template_to_dict(updated), 200)
+                return Response().error(f"通知模板 (id={template_id}) 不存在").__dict__
+
+            return Response().ok(self._template_to_dict(updated)).__dict__
 
         except ValueError as e:
-            return self._json_response({"error": str(e)}, 409)
+            return Response().error(str(e)).__dict__
         except Exception as e:
             logger.error(f"更新通知模板失败: {e}\n{traceback.format_exc()}")
-            return self._json_response({"error": f"更新通知模板失败: {e}"}, 500)
+            return Response().error(f"更新通知模板失败: {e}").__dict__
 
-    async def _delete_template(self, template_id: int):
-        """DELETE /api/templates/<id>
+    # ------------------------------------------------------------------
+    # POST /api/notification_template/delete
+    # ------------------------------------------------------------------
 
-        Response (200):
-            { "message": "通知模板 (id=<id>) 已删除" }
+    async def delete_template(self):
+        """Delete a notification template by ID.
+
+        Request body (JSON):
+            { "id": <int> }
+
+        Response:
+            { "status": "ok", "data": { "message": "..." } }
         """
         try:
-            deleted = self.db_helper.delete_notification_template(template_id)
+            data = await request.get_json()
+            if not data:
+                return Response().error("请求体不能为空").__dict__
+
+            template_id = data.get("id")
+            if template_id is None:
+                return Response().error("缺少必要参数: id").__dict__
+
+            deleted = self.db_helper.delete_notification_template(int(template_id))
             if not deleted:
-                return self._json_response(
-                    {"error": f"通知模板 (id={template_id}) 不存在"}, 404
-                )
-            return self._json_response(
-                {"message": f"通知模板 (id={template_id}) 已删除"}, 200
-            )
+                return Response().error(f"通知模板 (id={template_id}) 不存在").__dict__
+
+            return Response().ok({"message": f"通知模板 (id={template_id}) 已删除"}).__dict__
+
         except Exception as e:
             logger.error(f"删除通知模板失败: {e}\n{traceback.format_exc()}")
-            return self._json_response({"error": f"删除通知模板失败: {e}"}, 500)
+            return Response().error(f"删除通知模板失败: {e}").__dict__

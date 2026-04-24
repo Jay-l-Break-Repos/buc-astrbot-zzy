@@ -1,37 +1,37 @@
-"""Base Route class and shared types for AstrBot dashboard routes."""
-
-from dataclasses import dataclass, field
-from typing import Any
+from astrbot.core.config.astrbot_config import AstrBotConfig
+from dataclasses import dataclass
 from quart import Quart
 
 
 @dataclass
 class RouteContext:
-    config: Any
+    config: AstrBotConfig
     app: Quart
+
+
+class Route:
+    def __init__(self, context: RouteContext):
+        self.app = context.app
+        self.config = context.config
+
+    def register_routes(self):
+        for route, (method, func) in self.routes.items():
+            self.app.add_url_rule(f"/api{route}", view_func=func, methods=[method])
 
 
 @dataclass
 class Response:
-    status: bool = True
-    message: str = ""
-    data: Any = None
+    status: str = None
+    message: str = None
+    data: dict = None
 
-    def ok(self, message: str = "", data: Any = None) -> "Response":
-        self.status = True
+    def error(self, message: str):
+        self.status = "error"
         self.message = message
-        self.data = data
         return self
 
-    def error(self, message: str = "", data: Any = None) -> "Response":
-        self.status = False
-        self.message = message
+    def ok(self, data: dict = {}, message: str = None):
+        self.status = "ok"
         self.data = data
+        self.message = message
         return self
-
-
-class Route:
-    def __init__(self, context: RouteContext) -> None:
-        self.context = context
-        self.config = context.config
-        self.app = context.app
