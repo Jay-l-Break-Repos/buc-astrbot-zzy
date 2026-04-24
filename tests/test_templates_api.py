@@ -25,134 +25,129 @@ import pytest
 # Bootstrap: inject minimal stubs for unavailable packages BEFORE any imports
 # ---------------------------------------------------------------------------
 
-def _ensure_stubs():
-    """Inject quart and astrbot.core stubs if not already present."""
+def _build_stubs():
+    """Inject quart + astrbot.core stubs so project modules can be imported."""
+    # ── quart stub ──────────────────────────────────────────────────────────
+    quart_mod = types.ModuleType("quart")
 
-    # ── quart stub ──
-    if "quart" not in sys.modules:
-        mod = types.ModuleType("quart")
+    class _Response:
+        def __init__(self, data, status_code=200):
+            if isinstance(data, (dict, list)):
+                self._raw = json.dumps(data).encode()
+            else:
+                self._raw = data if isinstance(data, bytes) else str(data).encode()
+            self.status_code = status_code
 
-        class _Response:
-            def __init__(self, data, status_code=200):
-                if isinstance(data, (dict, list)):
-                    self._raw = json.dumps(data).encode()
-                else:
-                    self._raw = data if isinstance(data, bytes) else str(data).encode()
-                self.status_code = status_code
+        @property
+        def data(self):
+            return self._raw
 
-            @property
-            def data(self):
-                return self._raw
+    quart_mod.jsonify = lambda d: _Response(d)
+    quart_mod.request = types.SimpleNamespace(_json=None, args={})
+    quart_mod.send_from_directory = lambda *a, **kw: _Response(b"")
+    quart_mod.Quart = type("Quart", (), {})
+    sys.modules["quart"] = quart_mod
 
-        mod.jsonify = lambda d: _Response(d)
-        mod.request = types.SimpleNamespace(_json=None, args={})
-        mod.send_from_directory = lambda *a, **kw: _Response(b"")
-        mod.Quart = type("Quart", (), {})
-        sys.modules["quart"] = mod
-    else:
-        import quart as _q
-        if not hasattr(_q, "send_from_directory"):
-            _q.send_from_directory = lambda *a, **kw: None
+    # ── astrbot package stubs ───────────────────────────────────────────────
+    repo_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
-    # ── astrbot package stubs (only if not real packages) ──
-    if "astrbot" not in sys.modules or not hasattr(sys.modules["astrbot"], "__path__"):
-        pkg = types.ModuleType("astrbot")
-        pkg.__path__ = [os.path.join(os.path.dirname(os.path.dirname(
-            os.path.abspath(__file__))), "astrbot")]
-        pkg.__package__ = "astrbot"
-        sys.modules["astrbot"] = pkg
+    astrbot_pkg = types.ModuleType("astrbot")
+    astrbot_pkg.__path__ = [os.path.join(repo_root, "astrbot")]
+    astrbot_pkg.__package__ = "astrbot"
+    sys.modules.setdefault("astrbot", astrbot_pkg)
 
-    if "astrbot.core" not in sys.modules or not hasattr(sys.modules["astrbot.core"], "__path__"):
-        core = types.ModuleType("astrbot.core")
-        core.__path__ = [os.path.join(os.path.dirname(os.path.dirname(
-            os.path.abspath(__file__))), "astrbot", "core")]
-        core.__package__ = "astrbot.core"
-        core.logger = types.SimpleNamespace(
-            error=lambda *a, **kw: None,
-            info=lambda *a, **kw: None,
-            warning=lambda *a, **kw: None,
-        )
-        sys.modules["astrbot.core"] = core
+    core_pkg = types.ModuleType("astrbot.core")
+    core_pkg.__path__ = [os.path.join(repo_root, "astrbot", "core")]
+    core_pkg.__package__ = "astrbot.core"
+    core_pkg.logger = types.SimpleNamespace(
+        error=lambda *a, **k: None,
+        info=lambda *a, **k: None,
+        warning=lambda *a, **k: None,
+    )
+    sys.modules.setdefault("astrbot.core", core_pkg)
 
-    for _name in ("astrbot.core.config", "astrbot.core.config.astrbot_config"):
-        if _name not in sys.modules:
-            _m = types.ModuleType(_name)
-            _m.__path__ = []
-            if _name.endswith("astrbot_config"):
-                _m.AstrBotConfig = type("AstrBotConfig", (), {})
-            sys.modules[_name] = _m
+    cfg_pkg = types.ModuleType("astrbot.core.config")
+    cfg_pkg.__path__ = []
+    sys.modules.setdefault("astrbot.core.config", cfg_pkg)
+
+    cfg_sub = types.ModuleType("astrbot.core.config.astrbot_config")
+    cfg_sub.AstrBotConfig = type("AstrBotConfig", (), {})
+    sys.modules.setdefault("astrbot.core.config.astrbot_config", cfg_sub)
 
 
-_ensure_stubs()
+_build_stubs()
+
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-# Safe to import now
+# Safe to import project modules now
 from astrbot.core.db.sqlite import SQLiteDatabase
 import astrbot.dashboard.routes.templates_api as _api_mod
 from astrbot.dashboard.routes.templates_api import register_template_routes
 
 
 # ---------------------------------------------------------------------------
-# Minimal async test harness
+# Minimal async test harness (no Quart / pytest-asyncio required)
 # ---------------------------------------------------------------------------
 
 class _FakeApp:
-    """Collect route registrations and dispatch calls."""
+    """Collect route registrations and dispatch calls synchronously."""
 
     def __init__(self):
-        self._routes: dict = {}  # (pattern, method) -> handler
+        self._routes: dict = {}  # (path_pattern, METHOD) -> handler
 
     def route(self, path, methods=None):
         methods = [m.upper() for m in (methods or ["GET"])]
+
         def decorator(fn):
             for m in methods:
                 self._routes[(path, m)] = fn
             return fn
+
         return decorator
 
     def _resolve(self, path: str, method: str):
+        """Return (handler, kwargs) for the given path+method."""
         method = method.upper()
-        # Exact match
+        # Exact match first
         if (path, method) in self._routes:
             return self._routes[(path, method)], {}
-        # Pattern match: extract param names, build positional regex
+        # Pattern match: <int:x> and <x> segments
         for (pat, m), fn in self._routes.items():
             if m != method:
                 continue
+            # Extract param names in order
             param_names = re.findall(r"<(?:int:)?(\w+)>", pat)
+            # Build a plain regex (no named groups to avoid Python 3.13 issues)
             regex = re.sub(r"<int:\w+>", r"([0-9]+)", pat)
             regex = re.sub(r"<\w+>", r"([^/]+)", regex)
             match = re.fullmatch(regex, path)
             if match:
-                kwargs = {}
-                for name, val in zip(param_names, match.groups()):
-                    kwargs[name] = int(val) if val.isdigit() else val
+                vals = match.groups()
+                kwargs = {
+                    name: int(val) if val.isdigit() else val
+                    for name, val in zip(param_names, vals)
+                }
                 return fn, kwargs
         return None, {}
 
 
 def _call(app: _FakeApp, path: str, method: str, json_data=None):
-    """Invoke a registered route handler and return (status_code, data)."""
+    """Invoke a registered route handler and return (status_code, data_dict)."""
     handler, kwargs = app._resolve(path, method)
     assert handler is not None, f"No handler registered for {method} {path}"
 
-    # Patch the `request` name inside the templates_api module
+    # Patch the `request` name that was imported into templates_api
     orig_request = _api_mod.request
+    fake_request = types.SimpleNamespace(_json=json_data, args={})
 
     async def _get_json():
         return json_data
 
-    fake_request = types.SimpleNamespace(
-        _json=json_data,
-        args={},
-        get_json=_get_json,
-    )
+    fake_request.get_json = _get_json
     _api_mod.request = fake_request
 
     try:
-        loop = asyncio.new_event_loop()
-        result = loop.run_until_complete(handler(**kwargs))
-        loop.close()
+        result = asyncio.get_event_loop().run_until_complete(handler(**kwargs))
     finally:
         _api_mod.request = orig_request
 
@@ -161,8 +156,7 @@ def _call(app: _FakeApp, path: str, method: str, json_data=None):
     else:
         body, status = result, 200
 
-    raw = body.data if hasattr(body, "data") else b"{}"
-    data = json.loads(raw)
+    data = json.loads(body.data)
     return status, data
 
 
@@ -456,6 +450,22 @@ class TestPreviewTemplate:
                              {"variables": {}})
         assert status == 200
         assert data["rendered"] == "Count: 0"
+
+    def test_preview_with_filter_lower(self, app):
+        _, created = _call(app, "/api/templates", "POST",
+                           {"name": "low", "body": "{{ msg|lower }}"})
+        status, data = _call(app, f"/api/templates/{created['id']}/preview", "POST",
+                             {"variables": {"msg": "HELLO"}})
+        assert status == 200
+        assert data["rendered"] == "hello"
+
+    def test_preview_with_filter_truncate(self, app):
+        _, created = _call(app, "/api/templates", "POST",
+                           {"name": "trunc", "body": "{{ text|truncate(5) }}"})
+        status, data = _call(app, f"/api/templates/{created['id']}/preview", "POST",
+                             {"variables": {"text": "Hello World"}})
+        assert status == 200
+        assert data["rendered"] == "Hello…"
 
     def test_preview_returns_placeholders(self, app):
         _, created = _call(app, "/api/templates", "POST",
