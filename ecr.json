@@ -1,0 +1,7 @@
+{
+  "ecr_repo": "vulndock/candidate",
+  "ecr_tag": "ghsa-4m32-cjv7-f425",
+  "local_image": "vulndock-candidate-ghsa-4m32-cjv7-f425:latest",
+  "aux_images": {},
+  "docker_type": "direct"
+}
