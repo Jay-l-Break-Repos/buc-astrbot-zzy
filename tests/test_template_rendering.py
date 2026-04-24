@@ -177,6 +177,23 @@ class TestValidatePlaceholderSyntax:
         assert validate_placeholder_syntax("{{ var1 }}") == []
         assert validate_placeholder_syntax("{{ _private }}") == []
 
+    def test_block_tag_is_invalid(self):
+        """{% ... %} Jinja2 block tags are not supported."""
+        errors = validate_placeholder_syntax("{% if user %}hi{% endif %}")
+        assert len(errors) >= 1
+
+    def test_unclosed_brace_is_invalid(self):
+        """{{ without matching }} is invalid."""
+        errors = validate_placeholder_syntax("Hello {{ username }%, broken")
+        assert len(errors) >= 1
+
+    def test_mixed_block_and_unclosed_is_invalid(self):
+        """The exact body from the spec invalid-syntax test."""
+        errors = validate_placeholder_syntax(
+            "Hello {{ username }%, this is broken {% if %}"
+        )
+        assert len(errors) >= 1
+
 
 # ===========================================================================
 # render_template

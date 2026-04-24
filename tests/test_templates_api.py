@@ -225,6 +225,28 @@ class TestCreateTemplate:
         assert status == 400
         assert "syntax_errors" in data
 
+    def test_create_block_tag_returns_400(self, app):
+        """Jinja2 block tags {% ... %} are not supported."""
+        status, data = _call(app, "/api/templates", "POST",
+                             {"name": "block", "body": "Hello {% if user %}hi{% endif %}"})
+        assert status == 400
+        assert data.get("error") or data.get("detail")
+
+    def test_create_unclosed_brace_returns_400(self, app):
+        """Unclosed {{ without matching }} is invalid."""
+        status, data = _call(app, "/api/templates", "POST",
+                             {"name": "unclosed", "body": "Hello {{ username }%, broken"})
+        assert status == 400
+        assert data.get("error") or data.get("detail")
+
+    def test_create_mixed_invalid_returns_400(self, app):
+        """Body with both unclosed {{ and {% %} block tags is invalid."""
+        status, data = _call(app, "/api/templates", "POST",
+                             {"name": "mixed-bad",
+                              "body": "Hello {{ username }%, this is broken {% if %}"})
+        assert status == 400
+        assert data.get("error") or data.get("detail")
+
     def test_create_with_filter_syntax(self, app):
         status, data = _call(app, "/api/templates", "POST",
                              {"name": "filtered", "body": "Hi {{ username|upper }}!"})

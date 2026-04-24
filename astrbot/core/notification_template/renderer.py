@@ -56,6 +56,13 @@ _VALID_PLACEHOLDER_RE = re.compile(
 # but may be malformed – used for syntax validation.
 _ANY_BRACE_PAIR_RE = re.compile(r"\{\{(.*?)\}\}", re.DOTALL)
 
+# Detects an opening {{ that is NOT followed by a matching }}
+# (i.e. unclosed double-brace like "{{ username }%" or "{{ foo")
+_UNCLOSED_BRACE_RE = re.compile(r"\{\{(?!.*?\}\})", re.DOTALL)
+
+# Detects Jinja2 block tags {% ... %} which are not supported
+_BLOCK_TAG_RE = re.compile(r"\{%-?\s*\w")
+
 # Identifier pattern (without surrounding braces/whitespace/filters)
 _IDENTIFIER_RE = re.compile(r"^[A-Za-z_][A-Za-z0-9_.]*$")
 
@@ -221,6 +228,19 @@ def validate_placeholder_syntax(body: str) -> List[str]:
         ["占位符名称无效 '123bad': 必须以字母或下划线开头，只能包含字母、数字、下划线和点"]
     """
     errors: List[str] = []
+
+    # Check for unsupported Jinja2 block tags: {% ... %}
+    if _BLOCK_TAG_RE.search(body):
+        errors.append(
+            "模板包含不支持的 Jinja2 块标签 ({% ... %})，"
+            "仅支持 {{ variable }} 和 {{ variable|filter }} 语法"
+        )
+        return errors
+
+    # Check for unclosed {{ without matching }}
+    if _UNCLOSED_BRACE_RE.search(body):
+        errors.append("模板包含未闭合的占位符 ({{ 缺少对应的 }})")
+        return errors
 
     for match in _ANY_BRACE_PAIR_RE.finditer(body):
         inner = match.group(1)
