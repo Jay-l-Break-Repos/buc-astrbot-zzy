@@ -1,0 +1,1 @@
+# astrbot/core/db package
