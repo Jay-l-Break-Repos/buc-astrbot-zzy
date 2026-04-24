@@ -66,7 +66,7 @@ def register_template_routes(app, db_helper: BaseDatabase):
             syntax_errors = validate_placeholder_syntax(body)
             if syntax_errors:
                 return jsonify({"error": "模板正文包含无效的占位符语法",
-                                "syntax_errors": syntax_errors}), 422
+                                "syntax_errors": syntax_errors}), 400
 
             template = db_helper.create_notification_template(name=name, body=body)
             return jsonify(_template_to_dict(template)), 201
@@ -128,7 +128,7 @@ def register_template_routes(app, db_helper: BaseDatabase):
                 syntax_errors = validate_placeholder_syntax(body)
                 if syntax_errors:
                     return jsonify({"error": "模板正文包含无效的占位符语法",
-                                    "syntax_errors": syntax_errors}), 422
+                                    "syntax_errors": syntax_errors}), 400
 
             updated = db_helper.update_notification_template(
                 template_id=template_id, name=name, body=body
@@ -182,14 +182,14 @@ def register_template_routes(app, db_helper: BaseDatabase):
             syntax_errors = validate_placeholder_syntax(template.body)
             if syntax_errors:
                 return jsonify({"error": "模板正文包含无效的占位符语法",
-                                "syntax_errors": syntax_errors}), 422
+                                "syntax_errors": syntax_errors}), 400
 
             try:
                 rendered, warnings = render_template(
                     template.body, variables, missing_strategy=missing_strategy
                 )
             except KeyError as missing_key:
-                return jsonify({"error": f"变量 '{missing_key}' 未提供（missing_strategy='error'）"}), 422
+                return jsonify({"error": f"变量 '{missing_key}' 未提供（missing_strategy='error'）"}), 400
 
             return jsonify({
                 "rendered": rendered,

@@ -7,7 +7,7 @@ Covers:
   - GET    /api/templates/<id>       → 200 / 404
   - PUT    /api/templates/<id>       → 200 / 404 / 409
   - DELETE /api/templates/<id>       → 200 / 404
-  - POST   /api/templates/<id>/preview → 200 / 404 / 422
+  - POST   /api/templates/<id>/preview → 200 / 404 / 400
 
 Run with:
     python -m pytest tests/test_templates_api.py -v
@@ -219,10 +219,10 @@ class TestCreateTemplate:
                              {"name": "dup", "body": "body2"})
         assert status == 409
 
-    def test_create_invalid_syntax_returns_422(self, app):
+    def test_create_invalid_syntax_returns_400(self, app):
         status, data = _call(app, "/api/templates", "POST",
                              {"name": "bad", "body": "Hi {{  }}!"})
-        assert status == 422
+        assert status == 400
         assert "syntax_errors" in data
 
     def test_create_with_filter_syntax(self, app):
@@ -338,12 +338,12 @@ class TestUpdateTemplate:
                              {"name": "taken"})
         assert status == 409
 
-    def test_update_invalid_syntax_returns_422(self, app):
+    def test_update_invalid_syntax_returns_400(self, app):
         _, created = _call(app, "/api/templates", "POST",
                            {"name": "syn", "body": "valid {{ x }}"})
         status, data = _call(app, f"/api/templates/{created['id']}", "PUT",
                              {"body": "bad {{  }}"})
-        assert status == 422
+        assert status == 400
 
     def test_update_no_fields_returns_400(self, app):
         _, created = _call(app, "/api/templates", "POST",
