@@ -1,6 +1,22 @@
-# Re-export all upstream AstrBot dashboard routes so server.py can import them.
-# We also export our new NotificationTemplateRoute and register_template_routes.
+"""AstrBot dashboard routes package – overlay additions.
 
+When Docker copies our astrbot/ overlay on top of the cloned AstrBot,
+this file replaces the upstream astrbot/dashboard/routes/__init__.py.
+
+IMPORTANT: We must re-export everything the upstream __init__.py exported,
+because astrbot/dashboard/server.py does ``from .routes import *``.
+
+Upstream exports (from AstrBot v3.5.16):
+    AuthRoute, PluginRoute, ConfigRoute, UpdateRoute, StatRoute,
+    LogRoute, StaticFileRoute, ChatRoute, ToolsRoute, ConversationRoute,
+    FileRoute
+
+Our additions:
+    NotificationTemplateRoute, register_template_routes
+"""
+
+# Re-export all upstream route classes.  These modules exist in the Docker
+# image at /app/astrbot/dashboard/routes/ (cloned from AstrBot v3.5.16).
 from .auth import AuthRoute
 from .plugin import PluginRoute
 from .config import ConfigRoute
@@ -13,18 +29,12 @@ from .tools import ToolsRoute
 from .conversation import ConversationRoute
 from .file import FileRoute
 
-# Our additions
+# Our new additions (files we added in this overlay)
 from .notification_template import NotificationTemplateRoute
 from .templates_api import register_template_routes
 
-# StaticRoute lives in the parent package to avoid circular imports.
-def __getattr__(name):
-    if name == "StaticRoute":
-        from astrbot.dashboard.static_route import StaticRoute
-        return StaticRoute
-    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
-
 __all__ = [
+    # Upstream
     "AuthRoute",
     "PluginRoute",
     "ConfigRoute",
@@ -39,5 +49,4 @@ __all__ = [
     # Our additions
     "NotificationTemplateRoute",
     "register_template_routes",
-    "StaticRoute",
 ]
