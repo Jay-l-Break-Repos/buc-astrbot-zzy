@@ -1,0 +1,769 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>通知模板管理 - AstrBot</title>
+  <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      background: #f5f7fa;
+      color: #333;
+      min-height: 100vh;
+    }
+
+    /* ── Layout ── */
+    .container { max-width: 1100px; margin: 0 auto; padding: 24px 16px; }
+
+    /* ── Page header ── */
+    .page-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 24px;
+    }
+    .page-title { font-size: 1.5rem; font-weight: 600; }
+
+    /* ── Buttons ── */
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 8px 16px;
+      border: none;
+      border-radius: 6px;
+      font-size: 0.875rem;
+      font-weight: 500;
+      cursor: pointer;
+      transition: opacity .15s, background .15s;
+    }
+    .btn:disabled { opacity: .5; cursor: not-allowed; }
+    .btn-primary  { background: #4f46e5; color: #fff; }
+    .btn-primary:hover:not(:disabled)  { background: #4338ca; }
+    .btn-danger   { background: #ef4444; color: #fff; }
+    .btn-danger:hover:not(:disabled)   { background: #dc2626; }
+    .btn-secondary{ background: #e5e7eb; color: #374151; }
+    .btn-secondary:hover:not(:disabled){ background: #d1d5db; }
+    .btn-ghost    { background: transparent; color: #4f46e5; border: 1px solid #4f46e5; }
+    .btn-ghost:hover:not(:disabled)    { background: #ede9fe; }
+
+    /* ── Card ── */
+    .card {
+      background: #fff;
+      border-radius: 10px;
+      box-shadow: 0 1px 4px rgba(0,0,0,.08);
+      overflow: hidden;
+    }
+
+    /* ── Table ── */
+    table { width: 100%; border-collapse: collapse; }
+    thead th {
+      background: #f9fafb;
+      padding: 12px 16px;
+      text-align: left;
+      font-size: .8rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: .05em;
+      color: #6b7280;
+      border-bottom: 1px solid #e5e7eb;
+    }
+    tbody tr { border-bottom: 1px solid #f3f4f6; transition: background .1s; }
+    tbody tr:last-child { border-bottom: none; }
+    tbody tr:hover { background: #fafafa; }
+    tbody td { padding: 14px 16px; font-size: .875rem; vertical-align: top; }
+
+    .body-preview {
+      max-width: 340px;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      color: #6b7280;
+      font-family: monospace;
+      font-size: .8rem;
+    }
+
+    /* ── Placeholder tags ── */
+    .tag {
+      display: inline-block;
+      background: #ede9fe;
+      color: #5b21b6;
+      border-radius: 4px;
+      padding: 2px 7px;
+      font-size: .75rem;
+      font-family: monospace;
+      margin: 2px 2px 2px 0;
+    }
+
+    /* ── States ── */
+    .state-box {
+      padding: 48px 24px;
+      text-align: center;
+      color: #9ca3af;
+    }
+    .state-box .spinner {
+      width: 32px; height: 32px;
+      border: 3px solid #e5e7eb;
+      border-top-color: #4f46e5;
+      border-radius: 50%;
+      animation: spin .7s linear infinite;
+      margin: 0 auto 12px;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* ── Alerts ── */
+    .alert {
+      padding: 10px 14px;
+      border-radius: 6px;
+      font-size: .875rem;
+      margin-bottom: 12px;
+    }
+    .alert-error   { background: #fef2f2; color: #b91c1c; border: 1px solid #fecaca; }
+    .alert-warning { background: #fffbeb; color: #92400e; border: 1px solid #fde68a; }
+    .alert-success { background: #f0fdf4; color: #166534; border: 1px solid #bbf7d0; }
+
+    /* ── Modal overlay ── */
+    .modal-overlay {
+      position: fixed; inset: 0;
+      background: rgba(0,0,0,.45);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 100;
+      padding: 16px;
+    }
+    .modal {
+      background: #fff;
+      border-radius: 12px;
+      width: 100%;
+      max-width: 640px;
+      max-height: 90vh;
+      overflow-y: auto;
+      box-shadow: 0 20px 60px rgba(0,0,0,.2);
+    }
+    .modal-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 20px 24px 0;
+    }
+    .modal-title { font-size: 1.1rem; font-weight: 600; }
+    .modal-close {
+      background: none; border: none; cursor: pointer;
+      font-size: 1.25rem; color: #9ca3af; line-height: 1;
+    }
+    .modal-close:hover { color: #374151; }
+    .modal-body   { padding: 20px 24px; }
+    .modal-footer {
+      display: flex;
+      justify-content: flex-end;
+      gap: 10px;
+      padding: 0 24px 20px;
+    }
+
+    /* ── Form ── */
+    .form-group { margin-bottom: 16px; }
+    label { display: block; font-size: .875rem; font-weight: 500; margin-bottom: 6px; }
+    label .required { color: #ef4444; margin-left: 2px; }
+    input[type="text"], textarea, select {
+      width: 100%;
+      padding: 8px 12px;
+      border: 1px solid #d1d5db;
+      border-radius: 6px;
+      font-size: .875rem;
+      font-family: inherit;
+      transition: border-color .15s, box-shadow .15s;
+      outline: none;
+    }
+    input[type="text"]:focus, textarea:focus, select:focus {
+      border-color: #4f46e5;
+      box-shadow: 0 0 0 3px rgba(79,70,229,.15);
+    }
+    textarea { resize: vertical; min-height: 120px; font-family: monospace; }
+    .hint { font-size: .78rem; color: #6b7280; margin-top: 4px; }
+
+    /* ── Live preview panel ── */
+    .preview-panel {
+      background: #f9fafb;
+      border: 1px solid #e5e7eb;
+      border-radius: 8px;
+      padding: 14px;
+      margin-top: 12px;
+    }
+    .preview-panel h4 { font-size: .8rem; font-weight: 600; color: #6b7280; margin-bottom: 8px; text-transform: uppercase; letter-spacing: .05em; }
+    .preview-result {
+      font-family: monospace;
+      font-size: .85rem;
+      white-space: pre-wrap;
+      word-break: break-word;
+      color: #1f2937;
+      min-height: 40px;
+    }
+
+    /* ── Fade transition ── */
+    .fade-enter-active, .fade-leave-active { transition: opacity .2s; }
+    .fade-enter-from, .fade-leave-to { opacity: 0; }
+
+    /* ── Misc ── */
+    .actions { display: flex; gap: 8px; }
+    .date-cell { font-size: .78rem; color: #9ca3af; white-space: nowrap; }
+    .error-list { list-style: none; }
+    .error-list li::before { content: "⚠ "; }
+    .error-list li { font-size: .8rem; color: #b91c1c; margin-bottom: 4px; }
+  </style>
+</head>
+<body>
+<div id="app">
+  <div class="container">
+
+    <!-- ── Page header ── -->
+    <div class="page-header">
+      <h1 class="page-title">通知模板管理</h1>
+      <button class="btn btn-primary" @click="openCreateForm">＋ 新建模板</button>
+    </div>
+
+    <!-- ── List error ── -->
+    <transition name="fade">
+      <div v-if="listError" class="alert alert-error" style="margin-bottom:16px">
+        加载失败：{{ listError }}
+        <button class="btn btn-ghost" style="margin-left:12px;padding:4px 10px" @click="loadTemplates()">重试</button>
+      </div>
+    </transition>
+
+    <!-- ── Template table ── -->
+    <div class="card">
+      <!-- Loading state -->
+      <div v-if="listLoading" class="state-box">
+        <div class="spinner"></div>
+        <p>加载中…</p>
+      </div>
+
+      <!-- Empty state -->
+      <div v-else-if="!listError && templates.length === 0" class="state-box empty-state">
+        <p style="font-size:1.1rem;margin-bottom:8px">暂无通知模板</p>
+        <p style="font-size:.875rem">点击右上角「新建模板」开始创建</p>
+      </div>
+
+      <!-- Data table -->
+      <table v-else>
+        <thead>
+          <tr>
+            <th>名称</th>
+            <th>模板正文预览</th>
+            <th>占位符</th>
+            <th>创建时间</th>
+            <th>操作</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr v-for="tpl in templates" :key="tpl.id">
+            <td><strong>{{ tpl.name }}</strong></td>
+            <td><div class="body-preview">{{ tpl.body }}</div></td>
+            <td>
+              <span v-if="tpl.placeholders && tpl.placeholders.length">
+                <span v-for="ph in tpl.placeholders" :key="ph" class="tag">{{ ph }}</span>
+              </span>
+              <span v-else style="color:#9ca3af;font-size:.8rem">—</span>
+            </td>
+            <td class="date-cell">{{ formatDate(tpl.created_at) }}</td>
+            <td>
+              <div class="actions">
+                <button class="btn btn-ghost" style="padding:5px 10px;font-size:.8rem" @click="openPreview(tpl)">预览</button>
+                <button class="btn btn-secondary" style="padding:5px 10px;font-size:.8rem" @click="openEditForm(tpl)">编辑</button>
+                <button class="btn btn-danger" style="padding:5px 10px;font-size:.8rem" @click="openDeleteModal(tpl)">删除</button>
+              </div>
+            </td>
+          </tr>
+        </tbody>
+      </table>
+    </div><!-- /card -->
+
+    <!-- ════════════════════════════════════════════════════════════
+         CREATE / EDIT FORM MODAL
+         ════════════════════════════════════════════════════════════ -->
+    <transition name="fade">
+      <div v-if="showFormModal" class="modal-overlay" @mousedown.self="closeFormModal">
+        <div class="modal" role="dialog" aria-modal="true">
+          <div class="modal-header">
+            <h2 class="modal-title">{{ isEditing ? '编辑模板' : '新建模板' }}</h2>
+            <button class="modal-close" @click="closeFormModal" aria-label="关闭">✕</button>
+          </div>
+          <div class="modal-body">
+
+            <!-- Form error -->
+            <div v-if="formError" class="alert alert-error">{{ formError }}</div>
+
+            <!-- Name -->
+            <div class="form-group">
+              <label>模板名称<span class="required">*</span></label>
+              <input
+                type="text"
+                v-model="form.name"
+                placeholder="例如：欢迎消息"
+                required
+                :disabled="formSaving"
+              />
+            </div>
+
+            <!-- Body -->
+            <div class="form-group">
+              <label>模板正文<span class="required">*</span></label>
+              <textarea
+                v-model="form.body"
+                @input="onBodyInput"
+                placeholder="例如：你好 {{ username }}，欢迎使用 AstrBot！"
+                required
+                :disabled="formSaving"
+              ></textarea>
+              <p class="hint">使用 <code>{{ '{{ variable }}' }}</code> 语法插入占位符，例如 <code>{{ '{{ username }}' }}</code></p>
+            </div>
+
+            <!-- Live syntax errors -->
+            <transition name="fade">
+              <div v-if="liveSyntaxErrors.length" class="alert alert-error">
+                <strong>占位符语法错误：</strong>
+                <ul class="error-list">
+                  <li v-for="err in liveSyntaxErrors" :key="err">{{ err }}</li>
+                </ul>
+              </div>
+            </transition>
+
+            <!-- Detected placeholders -->
+            <transition name="fade">
+              <div v-if="detectedPlaceholders.length" style="margin-bottom:12px">
+                <span style="font-size:.8rem;color:#6b7280;font-weight:600">检测到的占位符：</span>
+                <span v-for="ph in detectedPlaceholders" :key="ph" class="tag">{{ ph }}</span>
+              </div>
+            </transition>
+
+            <!-- Live preview panel -->
+            <div v-if="form.body && !liveSyntaxErrors.length" class="preview-panel">
+              <h4>实时预览</h4>
+              <div v-if="detectedPlaceholders.length" style="margin-bottom:10px">
+                <div v-for="ph in detectedPlaceholders" :key="ph" class="form-group" style="margin-bottom:8px">
+                  <label style="font-size:.78rem;margin-bottom:3px">{{ ph }}</label>
+                  <input type="text" v-model="previewVars[ph]" :placeholder="ph" style="padding:5px 10px;font-size:.8rem" />
+                </div>
+              </div>
+              <div class="preview-result">{{ previewResult }}</div>
+            </div>
+
+          </div><!-- /modal-body -->
+          <div class="modal-footer">
+            <button class="btn btn-secondary" @click="closeFormModal" :disabled="formSaving">取消</button>
+            <button
+              class="btn btn-primary"
+              @click="saveTemplate"
+              :disabled="formSaving || liveSyntaxErrors.length > 0"
+            >
+              <span v-if="formSaving" class="spinner" style="width:14px;height:14px;border-width:2px;display:inline-block"></span>
+              {{ isEditing ? '保存修改' : '创建模板' }}
+            </button>
+          </div>
+        </div>
+      </div>
+    </transition>
+
+    <!-- ════════════════════════════════════════════════════════════
+         PREVIEW MODAL
+         ════════════════════════════════════════════════════════════ -->
+    <transition name="fade">
+      <div v-if="showPreviewModal" class="modal-overlay" @mousedown.self="showPreviewModal = false">
+        <div class="modal" role="dialog" aria-modal="true">
+          <div class="modal-header">
+            <h2 class="modal-title">预览模板：{{ previewTpl && previewTpl.name }}</h2>
+            <button class="modal-close" @click="showPreviewModal = false" aria-label="关闭">✕</button>
+          </div>
+          <div class="modal-body">
+
+            <!-- Raw body -->
+            <div class="form-group">
+              <label>原始模板正文</label>
+              <div style="font-family:monospace;font-size:.85rem;background:#f9fafb;border:1px solid #e5e7eb;border-radius:6px;padding:10px;white-space:pre-wrap;word-break:break-word">{{ previewTpl && previewTpl.body }}</div>
+            </div>
+
+            <!-- Placeholder tags -->
+            <div v-if="previewTpl && previewTpl.placeholders && previewTpl.placeholders.length" style="margin-bottom:16px">
+              <span style="font-size:.8rem;color:#6b7280;font-weight:600">占位符：</span>
+              <span v-for="ph in previewTpl.placeholders" :key="ph" class="tag">{{ ph }}</span>
+            </div>
+
+            <!-- Variable inputs -->
+            <div v-if="previewTpl && previewTpl.placeholders && previewTpl.placeholders.length">
+              <div v-for="ph in previewTpl.placeholders" :key="ph" class="form-group" style="margin-bottom:8px">
+                <label style="font-size:.8rem;margin-bottom:3px">{{ ph }}</label>
+                <input type="text" v-model="pvVars[ph]" :placeholder="ph" />
+              </div>
+            </div>
+
+            <!-- Missing strategy -->
+            <div class="form-group">
+              <label>缺失变量策略</label>
+              <select v-model="pvMissingStrategy">
+                <option value="keep">keep – 保留占位符原样</option>
+                <option value="empty">empty – 替换为空字符串</option>
+                <option value="error">error – 报错</option>
+              </select>
+            </div>
+
+            <!-- Render button / loading -->
+            <button class="btn btn-primary" @click="runPreview" :disabled="pvLoading" style="margin-bottom:14px">
+              <span v-if="pvLoading" class="spinner" style="width:14px;height:14px;border-width:2px;display:inline-block"></span>
+              渲染预览
+            </button>
+
+            <!-- Warnings -->
+            <transition name="fade">
+              <div v-if="pvWarnings.length" class="alert alert-warning" style="margin-bottom:10px">
+                <strong>警告：</strong>
+                <ul class="error-list" style="color:#92400e">
+                  <li v-for="w in pvWarnings" :key="w">{{ w }}</li>
+                </ul>
+              </div>
+            </transition>
+
+            <!-- Rendered output -->
+            <transition name="fade">
+              <div v-if="pvRendered !== null" class="preview-panel">
+                <h4>渲染结果</h4>
+                <div class="preview-result">{{ pvRendered }}</div>
+              </div>
+            </transition>
+
+          </div><!-- /modal-body -->
+          <div class="modal-footer">
+            <button class="btn btn-secondary" @click="showPreviewModal = false">关闭</button>
+            <button class="btn btn-ghost" @click="openEditFromPreview">编辑此模板</button>
+          </div>
+        </div>
+      </div>
+    </transition>
+
+    <!-- ════════════════════════════════════════════════════════════
+         DELETE CONFIRMATION MODAL
+         ════════════════════════════════════════════════════════════ -->
+    <transition name="fade">
+      <div v-if="showDeleteModal" class="modal-overlay" @mousedown.self="showDeleteModal = false">
+        <div class="modal" style="max-width:420px" role="dialog" aria-modal="true">
+          <div class="modal-header">
+            <h2 class="modal-title">确认删除</h2>
+            <button class="modal-close" @click="showDeleteModal = false" aria-label="关闭">✕</button>
+          </div>
+          <div class="modal-body">
+            <p style="margin-bottom:10px">
+              确定要删除模板
+              <strong>「{{ deleteTarget && deleteTarget.name }}」</strong>
+              吗？此操作不可撤销。
+            </p>
+            <transition name="fade">
+              <div v-if="deleteError" class="alert alert-error">{{ deleteError }}</div>
+            </transition>
+          </div>
+          <div class="modal-footer">
+            <button class="btn btn-secondary" @click="showDeleteModal = false">取消</button>
+            <button class="btn btn-danger" @click="confirmDelete" :disabled="deleteLoading">
+              <span v-if="deleteLoading" class="spinner" style="width:14px;height:14px;border-width:2px;display:inline-block"></span>
+              删除
+            </button>
+          </div>
+        </div>
+      </div>
+    </transition>
+
+  </div><!-- /container -->
+</div><!-- /#app -->
+
+<script>
+// ── Client-side placeholder utilities ──────────────────────────────────────
+
+const MAX_LEN = 64;
+
+/** Extract unique, valid placeholder names from a template body. */
+function extractPlaceholders(body) {
+  const re = /\{\{\s*([A-Za-z_][A-Za-z0-9_.]*)\s*\}\}/g;
+  const seen = new Set();
+  const result = [];
+  let m;
+  while ((m = re.exec(body)) !== null) {
+    if (!seen.has(m[1])) { seen.add(m[1]); result.push(m[1]); }
+  }
+  return result;
+}
+
+/** Validate all {{ … }} tokens in body; returns array of error strings. */
+function validateSyntax(body) {
+  const re = /\{\{([\s\S]*?)\}\}/g;
+  const identRe = /^[A-Za-z_][A-Za-z0-9_.]*$/;
+  const errors = [];
+  let m;
+  while ((m = re.exec(body)) !== null) {
+    const raw = m[0];
+    const inner = m[1].trim();
+    if (!inner) { errors.push(`占位符内容不能为空: '${raw}'`); continue; }
+    if (inner.length > MAX_LEN) { errors.push(`占位符名称过长 (最多 ${MAX_LEN} 个字符): '${raw}'`); continue; }
+    if (inner.startsWith('.') || inner.endsWith('.')) { errors.push(`占位符名称不能以点号开头或结尾: '${raw}'`); continue; }
+    if (inner.includes('..')) { errors.push(`占位符名称不能包含连续点号 (..): '${raw}'`); continue; }
+    if (!identRe.test(inner)) { errors.push(`占位符名称无效 '${inner}': 必须以字母或下划线开头，只能包含字母、数字、下划线和点`); continue; }
+  }
+  return errors;
+}
+
+/** Simple debounce helper. */
+function debounce(fn, delay) {
+  let timer;
+  return function(...args) {
+    clearTimeout(timer);
+    timer = setTimeout(() => fn.apply(this, args), delay);
+  };
+}
+
+// ── Vue application ─────────────────────────────────────────────────────────
+
+const { createApp, ref, computed, watch, reactive, nextTick } = Vue;
+
+createApp({
+  setup() {
+    // ── Template list ──
+    const templates    = ref([]);
+    const listLoading  = ref(false);
+    const listError    = ref(null);
+
+    async function loadTemplates() {
+      listLoading.value = true;
+      listError.value   = null;
+      try {
+        const res  = await fetch('/api/notification_template/list');
+        const json = await res.json();
+        if (json.status === 'ok') {
+          templates.value = json.data.templates || [];
+        } else {
+          listError.value = json.message || '未知错误';
+        }
+      } catch (e) {
+        listError.value = e.message;
+      } finally {
+        listLoading.value = false;
+      }
+    }
+
+    // ── Form modal ──
+    const showFormModal = ref(false);
+    const isEditing     = ref(false);
+    const editingId     = ref(null);
+    const formSaving    = ref(false);
+    const formError     = ref(null);
+    const form          = reactive({ name: '', body: '' });
+    const previewVars   = reactive({});
+    const liveSyntaxErrors    = ref([]);
+    const detectedPlaceholders = ref([]);
+
+    const previewResult = computed(() => {
+      if (!form.body || liveSyntaxErrors.value.length) return '';
+      let out = form.body;
+      for (const ph of detectedPlaceholders.value) {
+        const val = previewVars[ph] !== undefined ? previewVars[ph] : `{{ ${ph} }}`;
+        out = out.split(`{{ ${ph} }}`).join(val)
+                 .split(`{{${ph}}}`).join(val);
+      }
+      return out;
+    });
+
+    function onBodyInput() {
+      liveSyntaxErrors.value    = validateSyntax(form.body);
+      detectedPlaceholders.value = extractPlaceholders(form.body);
+      // Reset preview vars for new placeholders
+      for (const ph of detectedPlaceholders.value) {
+        if (!(ph in previewVars)) previewVars[ph] = '';
+      }
+    }
+
+    function openCreateForm() {
+      isEditing.value  = false;
+      editingId.value  = null;
+      form.name        = '';
+      form.body        = '';
+      formError.value  = null;
+      liveSyntaxErrors.value     = [];
+      detectedPlaceholders.value = [];
+      Object.keys(previewVars).forEach(k => delete previewVars[k]);
+      showFormModal.value = true;
+    }
+
+    function openEditForm(tpl) {
+      isEditing.value  = true;
+      editingId.value  = tpl.id;
+      form.name        = tpl.name;
+      form.body        = tpl.body;
+      formError.value  = null;
+      liveSyntaxErrors.value     = validateSyntax(tpl.body);
+      detectedPlaceholders.value = extractPlaceholders(tpl.body);
+      Object.keys(previewVars).forEach(k => delete previewVars[k]);
+      showFormModal.value = true;
+    }
+
+    function closeFormModal() {
+      if (formSaving.value) return;
+      showFormModal.value = false;
+    }
+
+    async function saveTemplate() {
+      formError.value = null;
+      if (!form.name.trim()) { formError.value = '模板名称不能为空'; return; }
+      if (!form.body)        { formError.value = '模板正文不能为空'; return; }
+      if (liveSyntaxErrors.value.length) return;
+
+      formSaving.value = true;
+      try {
+        const url     = isEditing.value
+          ? '/api/notification_template/update'
+          : '/api/notification_template/create';
+        const payload = isEditing.value
+          ? { id: editingId.value, name: form.name.trim(), body: form.body }
+          : { name: form.name.trim(), body: form.body };
+
+        const res  = await fetch(url, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload),
+        });
+        const json = await res.json();
+        if (json.status === 'ok') {
+          showFormModal.value = false;
+          await loadTemplates();
+        } else {
+          formError.value = json.message || '操作失败';
+        }
+      } catch (e) {
+        formError.value = e.message;
+      } finally {
+        formSaving.value = false;
+      }
+    }
+
+    // ── Preview modal ──
+    const showPreviewModal = ref(false);
+    const previewTpl       = ref(null);
+    const pvVars           = reactive({});
+    const pvMissingStrategy = ref('keep');
+    const pvLoading        = ref(false);
+    const pvRendered       = ref(null);
+    const pvWarnings       = ref([]);
+
+    function openPreview(tpl) {
+      previewTpl.value    = tpl;
+      pvRendered.value    = null;
+      pvWarnings.value    = [];
+      pvMissingStrategy.value = 'keep';
+      Object.keys(pvVars).forEach(k => delete pvVars[k]);
+      if (tpl.placeholders) {
+        for (const ph of tpl.placeholders) pvVars[ph] = '';
+      }
+      showPreviewModal.value = true;
+    }
+
+    async function runPreview() {
+      pvLoading.value  = true;
+      pvRendered.value = null;
+      pvWarnings.value = [];
+      try {
+        const res  = await fetch('/api/notification_template/preview', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            id: previewTpl.value.id,
+            variables: { ...pvVars },
+            missing_strategy: pvMissingStrategy.value,
+          }),
+        });
+        const json = await res.json();
+        if (json.status === 'ok') {
+          pvRendered.value = json.data.rendered;
+          pvWarnings.value = json.data.warnings || [];
+        } else {
+          pvWarnings.value = [json.message || '渲染失败'];
+        }
+      } catch (e) {
+        pvWarnings.value = [e.message];
+      } finally {
+        pvLoading.value = false;
+      }
+    }
+
+    function openEditFromPreview() {
+      const tpl = previewTpl.value;
+      showPreviewModal.value = false;
+      nextTick(() => openEditForm(tpl));
+    }
+
+    // ── Delete modal ──
+    const showDeleteModal = ref(false);
+    const deleteTarget    = ref(null);
+    const deleteLoading   = ref(false);
+    const deleteError     = ref(null);
+
+    function openDeleteModal(tpl) {
+      deleteTarget.value  = tpl;
+      deleteError.value   = null;
+      showDeleteModal.value = true;
+    }
+
+    async function confirmDelete() {
+      deleteError.value   = null;
+      deleteLoading.value = true;
+      try {
+        const res  = await fetch('/api/notification_template/delete', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ id: deleteTarget.value.id }),
+        });
+        const json = await res.json();
+        if (json.status === 'ok') {
+          showDeleteModal.value = false;
+          await loadTemplates();
+        } else {
+          deleteError.value = json.message || '删除失败';
+        }
+      } catch (e) {
+        deleteError.value = e.message;
+      } finally {
+        deleteLoading.value = false;
+      }
+    }
+
+    // ── Utilities ──
+    function formatDate(ts) {
+      if (!ts) return '—';
+      return new Date(ts * 1000).toLocaleString('zh-CN', {
+        year: 'numeric', month: '2-digit', day: '2-digit',
+        hour: '2-digit', minute: '2-digit',
+      });
+    }
+
+    // ── Init ──
+    loadTemplates();
+
+    return {
+      // list
+      templates, listLoading, listError, loadTemplates,
+      // form modal
+      showFormModal, isEditing, form, formSaving, formError,
+      previewVars, liveSyntaxErrors, detectedPlaceholders, previewResult,
+      onBodyInput, openCreateForm, openEditForm, closeFormModal, saveTemplate,
+      // preview modal
+      showPreviewModal, previewTpl, pvVars, pvMissingStrategy,
+      pvLoading, pvRendered, pvWarnings,
+      openPreview, runPreview, openEditFromPreview,
+      // delete modal
+      showDeleteModal, deleteTarget, deleteLoading, deleteError,
+      openDeleteModal, confirmDelete,
+      // utils
+      formatDate,
+    };
+  },
+}).mount('#app');
+</script>
+</body>
+</html>
