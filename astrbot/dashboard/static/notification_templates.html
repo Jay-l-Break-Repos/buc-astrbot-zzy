@@ -1,0 +1,1094 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>通知模板管理 – AstrBot</title>
+
+  <!-- Vue 3 (CDN) -->
+  <script src="https://unpkg.com/vue@3/dist/vue.global.prod.js"></script>
+
+  <style>
+    /* ------------------------------------------------------------------ */
+    /* Reset & base                                                         */
+    /* ------------------------------------------------------------------ */
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --color-bg:          #f5f6fa;
+      --color-surface:     #ffffff;
+      --color-border:      #e2e8f0;
+      --color-primary:     #4f6ef7;
+      --color-primary-h:   #3b57e0;
+      --color-danger:      #ef4444;
+      --color-danger-h:    #dc2626;
+      --color-success:     #22c55e;
+      --color-warning:     #f59e0b;
+      --color-text:        #1e293b;
+      --color-muted:       #64748b;
+      --color-tag-bg:      #eff6ff;
+      --color-tag-text:    #3b82f6;
+      --radius:            8px;
+      --shadow:            0 1px 4px rgba(0,0,0,.08), 0 4px 16px rgba(0,0,0,.06);
+      --transition:        .18s ease;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      background: var(--color-bg);
+      color: var(--color-text);
+      min-height: 100vh;
+      padding: 24px 16px;
+    }
+
+    /* ------------------------------------------------------------------ */
+    /* Layout                                                               */
+    /* ------------------------------------------------------------------ */
+    .page-wrap {
+      max-width: 1100px;
+      margin: 0 auto;
+    }
+
+    .page-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 24px;
+      flex-wrap: wrap;
+      gap: 12px;
+    }
+
+    .page-title {
+      font-size: 1.5rem;
+      font-weight: 700;
+      color: var(--color-text);
+    }
+
+    .page-subtitle {
+      font-size: .875rem;
+      color: var(--color-muted);
+      margin-top: 2px;
+    }
+
+    /* ------------------------------------------------------------------ */
+    /* Card                                                                 */
+    /* ------------------------------------------------------------------ */
+    .card {
+      background: var(--color-surface);
+      border: 1px solid var(--color-border);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+      overflow: hidden;
+    }
+
+    .card-header {
+      padding: 16px 20px;
+      border-bottom: 1px solid var(--color-border);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      flex-wrap: wrap;
+    }
+
+    .card-title {
+      font-size: 1rem;
+      font-weight: 600;
+    }
+
+    /* ------------------------------------------------------------------ */
+    /* Buttons                                                              */
+    /* ------------------------------------------------------------------ */
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 8px 16px;
+      border-radius: 6px;
+      font-size: .875rem;
+      font-weight: 500;
+      cursor: pointer;
+      border: none;
+      transition: background var(--transition), opacity var(--transition);
+      white-space: nowrap;
+    }
+    .btn:disabled { opacity: .55; cursor: not-allowed; }
+
+    .btn-primary  { background: var(--color-primary);  color: #fff; }
+    .btn-primary:hover:not(:disabled)  { background: var(--color-primary-h); }
+
+    .btn-danger   { background: var(--color-danger);   color: #fff; }
+    .btn-danger:hover:not(:disabled)   { background: var(--color-danger-h); }
+
+    .btn-ghost {
+      background: transparent;
+      color: var(--color-primary);
+      border: 1px solid var(--color-primary);
+    }
+    .btn-ghost:hover:not(:disabled) { background: #eff3ff; }
+
+    .btn-ghost-danger {
+      background: transparent;
+      color: var(--color-danger);
+      border: 1px solid var(--color-danger);
+    }
+    .btn-ghost-danger:hover:not(:disabled) { background: #fef2f2; }
+
+    .btn-sm { padding: 5px 10px; font-size: .8rem; }
+
+    .btn-icon {
+      padding: 6px;
+      border-radius: 6px;
+      background: transparent;
+      border: 1px solid var(--color-border);
+      cursor: pointer;
+      color: var(--color-muted);
+      transition: background var(--transition), color var(--transition);
+      line-height: 1;
+    }
+    .btn-icon:hover { background: var(--color-bg); color: var(--color-text); }
+    .btn-icon.danger:hover { background: #fef2f2; color: var(--color-danger); border-color: var(--color-danger); }
+
+    /* ------------------------------------------------------------------ */
+    /* Form elements                                                        */
+    /* ------------------------------------------------------------------ */
+    .form-group { margin-bottom: 16px; }
+    .form-label {
+      display: block;
+      font-size: .875rem;
+      font-weight: 500;
+      margin-bottom: 6px;
+      color: var(--color-text);
+    }
+    .form-label .required { color: var(--color-danger); margin-left: 2px; }
+    .form-hint { font-size: .78rem; color: var(--color-muted); margin-top: 4px; }
+
+    .form-input, .form-textarea, .form-select {
+      width: 100%;
+      padding: 9px 12px;
+      border: 1px solid var(--color-border);
+      border-radius: 6px;
+      font-size: .875rem;
+      color: var(--color-text);
+      background: var(--color-surface);
+      transition: border-color var(--transition), box-shadow var(--transition);
+      outline: none;
+      font-family: inherit;
+    }
+    .form-input:focus, .form-textarea:focus, .form-select:focus {
+      border-color: var(--color-primary);
+      box-shadow: 0 0 0 3px rgba(79,110,247,.15);
+    }
+    .form-input.error, .form-textarea.error {
+      border-color: var(--color-danger);
+    }
+    .form-textarea {
+      resize: vertical;
+      min-height: 120px;
+      font-family: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
+      font-size: .82rem;
+      line-height: 1.6;
+    }
+
+    /* ------------------------------------------------------------------ */
+    /* Tags / badges                                                        */
+    /* ------------------------------------------------------------------ */
+    .tag {
+      display: inline-flex;
+      align-items: center;
+      gap: 3px;
+      padding: 2px 8px;
+      border-radius: 99px;
+      font-size: .75rem;
+      font-weight: 500;
+      background: var(--color-tag-bg);
+      color: var(--color-tag-text);
+    }
+    .tag-list { display: flex; flex-wrap: wrap; gap: 4px; }
+
+    .badge {
+      display: inline-block;
+      padding: 2px 8px;
+      border-radius: 99px;
+      font-size: .72rem;
+      font-weight: 600;
+    }
+    .badge-success { background: #dcfce7; color: #15803d; }
+    .badge-warning { background: #fef9c3; color: #a16207; }
+    .badge-danger  { background: #fee2e2; color: #b91c1c; }
+
+    /* ------------------------------------------------------------------ */
+    /* Alert / error box                                                    */
+    /* ------------------------------------------------------------------ */
+    .alert {
+      padding: 10px 14px;
+      border-radius: 6px;
+      font-size: .85rem;
+      margin-bottom: 14px;
+    }
+    .alert-error   { background: #fef2f2; border: 1px solid #fecaca; color: #b91c1c; }
+    .alert-warning { background: #fffbeb; border: 1px solid #fde68a; color: #92400e; }
+    .alert-success { background: #f0fdf4; border: 1px solid #bbf7d0; color: #15803d; }
+    .alert-info    { background: #eff6ff; border: 1px solid #bfdbfe; color: #1d4ed8; }
+
+    .alert ul { margin: 4px 0 0 16px; }
+    .alert li { margin-top: 2px; }
+
+    /* ------------------------------------------------------------------ */
+    /* Table                                                                */
+    /* ------------------------------------------------------------------ */
+    .table-wrap { overflow-x: auto; }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: .875rem;
+    }
+    thead th {
+      padding: 10px 16px;
+      text-align: left;
+      font-weight: 600;
+      font-size: .78rem;
+      text-transform: uppercase;
+      letter-spacing: .04em;
+      color: var(--color-muted);
+      background: var(--color-bg);
+      border-bottom: 1px solid var(--color-border);
+      white-space: nowrap;
+    }
+    tbody tr {
+      border-bottom: 1px solid var(--color-border);
+      transition: background var(--transition);
+    }
+    tbody tr:last-child { border-bottom: none; }
+    tbody tr:hover { background: #fafbff; }
+    tbody td { padding: 12px 16px; vertical-align: middle; }
+
+    .body-preview {
+      font-family: "SFMono-Regular", Consolas, monospace;
+      font-size: .8rem;
+      color: var(--color-muted);
+      max-width: 320px;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .actions-cell { display: flex; gap: 6px; align-items: center; }
+
+    /* ------------------------------------------------------------------ */
+    /* Modal / overlay                                                      */
+    /* ------------------------------------------------------------------ */
+    .overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(15,23,42,.45);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 100;
+      padding: 16px;
+    }
+
+    .modal {
+      background: var(--color-surface);
+      border-radius: var(--radius);
+      box-shadow: 0 8px 40px rgba(0,0,0,.18);
+      width: 100%;
+      max-width: 720px;
+      max-height: 92vh;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+
+    .modal-sm { max-width: 440px; }
+
+    .modal-header {
+      padding: 18px 24px 14px;
+      border-bottom: 1px solid var(--color-border);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    .modal-title { font-size: 1.05rem; font-weight: 700; }
+
+    .modal-body {
+      padding: 20px 24px;
+      overflow-y: auto;
+      flex: 1;
+    }
+
+    .modal-footer {
+      padding: 14px 24px;
+      border-top: 1px solid var(--color-border);
+      display: flex;
+      justify-content: flex-end;
+      gap: 10px;
+    }
+
+    /* ------------------------------------------------------------------ */
+    /* Split layout for form + preview                                      */
+    /* ------------------------------------------------------------------ */
+    .split {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 20px;
+    }
+    @media (max-width: 640px) {
+      .split { grid-template-columns: 1fr; }
+    }
+
+    /* ------------------------------------------------------------------ */
+    /* Preview panel                                                        */
+    /* ------------------------------------------------------------------ */
+    .preview-panel {
+      background: var(--color-bg);
+      border: 1px solid var(--color-border);
+      border-radius: 6px;
+      padding: 14px;
+    }
+    .preview-panel-title {
+      font-size: .8rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: .05em;
+      color: var(--color-muted);
+      margin-bottom: 10px;
+    }
+    .preview-output {
+      background: #1e293b;
+      color: #e2e8f0;
+      border-radius: 6px;
+      padding: 12px 14px;
+      font-family: "SFMono-Regular", Consolas, monospace;
+      font-size: .82rem;
+      line-height: 1.7;
+      white-space: pre-wrap;
+      word-break: break-word;
+      min-height: 80px;
+    }
+    .preview-placeholder { color: #94a3b8; font-style: italic; }
+
+    .var-inputs { display: flex; flex-direction: column; gap: 8px; }
+    .var-input-row {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px;
+      align-items: center;
+    }
+    .var-key {
+      font-family: "SFMono-Regular", Consolas, monospace;
+      font-size: .8rem;
+      color: var(--color-primary);
+      font-weight: 600;
+      padding: 6px 0;
+    }
+
+    /* ------------------------------------------------------------------ */
+    /* Empty state                                                          */
+    /* ------------------------------------------------------------------ */
+    .empty-state {
+      text-align: center;
+      padding: 56px 24px;
+      color: var(--color-muted);
+    }
+    .empty-icon { font-size: 3rem; margin-bottom: 12px; }
+    .empty-title { font-size: 1rem; font-weight: 600; margin-bottom: 6px; color: var(--color-text); }
+    .empty-desc  { font-size: .875rem; }
+
+    /* ------------------------------------------------------------------ */
+    /* Spinner                                                              */
+    /* ------------------------------------------------------------------ */
+    .spinner {
+      display: inline-block;
+      width: 18px; height: 18px;
+      border: 2px solid rgba(255,255,255,.4);
+      border-top-color: #fff;
+      border-radius: 50%;
+      animation: spin .7s linear infinite;
+    }
+    .spinner-dark {
+      border-color: rgba(79,110,247,.25);
+      border-top-color: var(--color-primary);
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* ------------------------------------------------------------------ */
+    /* Misc                                                                 */
+    /* ------------------------------------------------------------------ */
+    .divider { border: none; border-top: 1px solid var(--color-border); margin: 16px 0; }
+    .text-muted { color: var(--color-muted); font-size: .8rem; }
+    .mt-2 { margin-top: 8px; }
+    .mt-3 { margin-top: 12px; }
+    .flex-row { display: flex; align-items: center; gap: 8px; }
+
+    /* Transition */
+    .fade-enter-active, .fade-leave-active { transition: opacity .2s; }
+    .fade-enter-from, .fade-leave-to { opacity: 0; }
+  </style>
+</head>
+<body>
+<div id="app">
+  <div class="page-wrap">
+
+    <!-- ================================================================ -->
+    <!-- Page header                                                        -->
+    <!-- ================================================================ -->
+    <div class="page-header">
+      <div>
+        <div class="page-title">📋 通知模板管理</div>
+        <div class="page-subtitle">创建和管理带有占位符的消息模板，用于机器人发送通知</div>
+      </div>
+      <button class="btn btn-primary" @click="openCreateModal">
+        <span>＋</span> 新建模板
+      </button>
+    </div>
+
+    <!-- ================================================================ -->
+    <!-- Template list card                                                 -->
+    <!-- ================================================================ -->
+    <div class="card">
+      <div class="card-header">
+        <span class="card-title">模板列表</span>
+        <span class="text-muted">共 {{ templates.length }} 个模板</span>
+      </div>
+
+      <!-- Loading -->
+      <div v-if="listLoading" style="padding:40px;text-align:center;">
+        <div class="spinner spinner-dark" style="width:28px;height:28px;margin:0 auto;"></div>
+        <div class="text-muted mt-2">加载中…</div>
+      </div>
+
+      <!-- Error -->
+      <div v-else-if="listError" style="padding:20px;">
+        <div class="alert alert-error">{{ listError }}</div>
+        <button class="btn btn-ghost btn-sm" @click="loadTemplates">重试</button>
+      </div>
+
+      <!-- Empty -->
+      <div v-else-if="templates.length === 0" class="empty-state">
+        <div class="empty-icon">📄</div>
+        <div class="empty-title">暂无通知模板</div>
+        <div class="empty-desc">点击右上角「新建模板」开始创建</div>
+      </div>
+
+      <!-- Table -->
+      <div v-else class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>名称</th>
+              <th>模板正文预览</th>
+              <th>占位符</th>
+              <th>创建时间</th>
+              <th>更新时间</th>
+              <th>操作</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr v-for="tpl in templates" :key="tpl.id">
+              <td><strong>{{ tpl.name }}</strong></td>
+              <td><div class="body-preview" :title="tpl.body">{{ tpl.body }}</div></td>
+              <td>
+                <div class="tag-list" v-if="tpl.placeholders && tpl.placeholders.length">
+                  <span class="tag" v-for="p in tpl.placeholders" :key="p">{{ p }}</span>
+                </div>
+                <span class="text-muted" v-else>—</span>
+              </td>
+              <td class="text-muted">{{ formatDate(tpl.created_at) }}</td>
+              <td class="text-muted">{{ formatDate(tpl.updated_at) }}</td>
+              <td>
+                <div class="actions-cell">
+                  <button class="btn-icon" title="预览" @click="openPreviewModal(tpl)">👁</button>
+                  <button class="btn-icon" title="编辑" @click="openEditModal(tpl)">✏️</button>
+                  <button class="btn-icon danger" title="删除" @click="openDeleteModal(tpl)">🗑</button>
+                </div>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div><!-- /card -->
+
+  </div><!-- /page-wrap -->
+
+  <!-- ================================================================== -->
+  <!-- Create / Edit Modal                                                  -->
+  <!-- ================================================================== -->
+  <transition name="fade">
+    <div class="overlay" v-if="showFormModal" @mousedown.self="closeFormModal">
+      <div class="modal">
+        <div class="modal-header">
+          <span class="modal-title">{{ isEditing ? '编辑模板' : '新建模板' }}</span>
+          <button class="btn-icon" @click="closeFormModal">✕</button>
+        </div>
+
+        <div class="modal-body">
+          <!-- Global error -->
+          <div class="alert alert-error" v-if="formError">
+            <strong>{{ formError }}</strong>
+            <ul v-if="formSyntaxErrors.length">
+              <li v-for="e in formSyntaxErrors" :key="e">{{ e }}</li>
+            </ul>
+          </div>
+
+          <div class="split">
+            <!-- Left: form fields -->
+            <div>
+              <!-- Name -->
+              <div class="form-group">
+                <label class="form-label">
+                  模板名称 <span class="required">*</span>
+                </label>
+                <input
+                  class="form-input"
+                  :class="{ error: fieldErrors.name }"
+                  v-model="form.name"
+                  placeholder="例如: welcome_message"
+                  @input="fieldErrors.name = ''"
+                />
+                <div class="form-hint" v-if="fieldErrors.name" style="color:var(--color-danger)">
+                  {{ fieldErrors.name }}
+                </div>
+                <div class="form-hint" v-else>唯一标识符，不可重复</div>
+              </div>
+
+              <!-- Body -->
+              <div class="form-group">
+                <label class="form-label">
+                  模板正文 <span class="required">*</span>
+                </label>
+                <textarea
+                  class="form-textarea"
+                  :class="{ error: fieldErrors.body }"
+                  v-model="form.body"
+                  placeholder="输入模板内容，使用 {{ variable }} 插入占位符&#10;例如: 你好 {{ username }}，你有 {{ count }} 条新消息。"
+                  rows="7"
+                  @input="onBodyInput"
+                ></textarea>
+                <div class="form-hint" v-if="fieldErrors.body" style="color:var(--color-danger)">
+                  {{ fieldErrors.body }}
+                </div>
+                <div class="form-hint" v-else>
+                  使用 <code style="background:#f1f5f9;padding:1px 4px;border-radius:3px;">{{ '{{ variable }}' }}</code> 语法插入变量
+                </div>
+              </div>
+
+              <!-- Detected placeholders -->
+              <div v-if="detectedPlaceholders.length" class="form-group">
+                <label class="form-label">检测到的占位符</label>
+                <div class="tag-list">
+                  <span class="tag" v-for="p in detectedPlaceholders" :key="p">{{ p }}</span>
+                </div>
+              </div>
+
+              <!-- Syntax errors (live) -->
+              <div v-if="liveSyntaxErrors.length" class="alert alert-error">
+                <strong>占位符语法错误：</strong>
+                <ul>
+                  <li v-for="e in liveSyntaxErrors" :key="e">{{ e }}</li>
+                </ul>
+              </div>
+            </div>
+
+            <!-- Right: live preview -->
+            <div>
+              <div class="preview-panel">
+                <div class="preview-panel-title">实时预览</div>
+
+                <!-- Variable inputs -->
+                <div v-if="detectedPlaceholders.length">
+                  <div class="text-muted" style="margin-bottom:8px;font-size:.78rem;">填写示例值以预览渲染效果：</div>
+                  <div class="var-inputs">
+                    <div class="var-input-row" v-for="p in detectedPlaceholders" :key="p">
+                      <div class="var-key">{{ '{{' }} {{ p }} {{ '}}' }}</div>
+                      <input
+                        class="form-input"
+                        style="font-size:.8rem;padding:5px 8px;"
+                        :placeholder="p"
+                        v-model="previewVars[p]"
+                        @input="debouncedPreview"
+                      />
+                    </div>
+                  </div>
+                  <hr class="divider" />
+                </div>
+
+                <!-- Rendered output -->
+                <div class="preview-output" v-if="previewResult">{{ previewResult }}</div>
+                <div class="preview-output preview-placeholder" v-else-if="form.body">
+                  {{ form.body }}
+                </div>
+                <div class="preview-output preview-placeholder" v-else>
+                  在左侧输入模板正文后，预览将显示在这里…
+                </div>
+
+                <!-- Preview warnings -->
+                <div v-if="previewWarnings.length" class="alert alert-warning mt-2">
+                  <strong>提示：</strong>
+                  <ul>
+                    <li v-for="w in previewWarnings" :key="w">{{ w }}</li>
+                  </ul>
+                </div>
+              </div>
+            </div>
+          </div><!-- /split -->
+        </div><!-- /modal-body -->
+
+        <div class="modal-footer">
+          <button class="btn btn-ghost" @click="closeFormModal" :disabled="formSaving">取消</button>
+          <button class="btn btn-primary" @click="saveTemplate" :disabled="formSaving || liveSyntaxErrors.length > 0">
+            <span class="spinner" v-if="formSaving"></span>
+            {{ isEditing ? '保存修改' : '创建模板' }}
+          </button>
+        </div>
+      </div>
+    </div>
+  </transition>
+
+  <!-- ================================================================== -->
+  <!-- Preview Modal (read-only, from list)                                 -->
+  <!-- ================================================================== -->
+  <transition name="fade">
+    <div class="overlay" v-if="showPreviewModal" @mousedown.self="showPreviewModal = false">
+      <div class="modal">
+        <div class="modal-header">
+          <span class="modal-title">预览模板：{{ previewTpl && previewTpl.name }}</span>
+          <button class="btn-icon" @click="showPreviewModal = false">✕</button>
+        </div>
+
+        <div class="modal-body" v-if="previewTpl">
+          <!-- Template info -->
+          <div class="flex-row" style="margin-bottom:14px;flex-wrap:wrap;gap:8px;">
+            <div>
+              <span class="text-muted">占位符：</span>
+              <span v-if="previewTpl.placeholders && previewTpl.placeholders.length">
+                <span class="tag" v-for="p in previewTpl.placeholders" :key="p" style="margin-right:4px;">{{ p }}</span>
+              </span>
+              <span class="text-muted" v-else>无</span>
+            </div>
+          </div>
+
+          <div class="split">
+            <!-- Left: variable inputs + strategy -->
+            <div>
+              <div class="form-group">
+                <label class="form-label">缺失变量策略</label>
+                <select class="form-select" v-model="pvMissingStrategy" @change="runPreview">
+                  <option value="keep">keep – 保留占位符原样</option>
+                  <option value="empty">empty – 替换为空字符串</option>
+                  <option value="error">error – 报错（需提供所有变量）</option>
+                </select>
+              </div>
+
+              <div v-if="previewTpl.placeholders && previewTpl.placeholders.length">
+                <label class="form-label">填写示例值</label>
+                <div class="var-inputs">
+                  <div class="var-input-row" v-for="p in previewTpl.placeholders" :key="p">
+                    <div class="var-key">{{ '{{' }} {{ p }} {{ '}}' }}</div>
+                    <input
+                      class="form-input"
+                      style="font-size:.8rem;padding:5px 8px;"
+                      :placeholder="p"
+                      v-model="pvVars[p]"
+                      @input="debouncedRunPreview"
+                    />
+                  </div>
+                </div>
+              </div>
+              <div v-else class="text-muted">此模板没有占位符，无需填写变量。</div>
+            </div>
+
+            <!-- Right: rendered output -->
+            <div>
+              <div class="preview-panel">
+                <div class="preview-panel-title">渲染结果</div>
+
+                <div v-if="pvLoading" style="text-align:center;padding:20px;">
+                  <div class="spinner spinner-dark" style="margin:0 auto;"></div>
+                </div>
+                <div v-else-if="pvError" class="alert alert-error">{{ pvError }}</div>
+                <template v-else>
+                  <div class="preview-output">{{ pvRendered || previewTpl.body }}</div>
+                  <div v-if="pvWarnings.length" class="alert alert-warning mt-2">
+                    <strong>提示：</strong>
+                    <ul><li v-for="w in pvWarnings" :key="w">{{ w }}</li></ul>
+                  </div>
+                </template>
+              </div>
+
+              <!-- Raw body -->
+              <div style="margin-top:14px;">
+                <div class="preview-panel-title" style="font-size:.75rem;color:var(--color-muted);margin-bottom:6px;">原始模板正文</div>
+                <div class="preview-output" style="background:#f8fafc;color:#475569;border:1px solid var(--color-border);">{{ previewTpl.body }}</div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="modal-footer">
+          <button class="btn btn-ghost" @click="showPreviewModal = false">关闭</button>
+          <button class="btn btn-primary" @click="openEditFromPreview">编辑此模板</button>
+        </div>
+      </div>
+    </div>
+  </transition>
+
+  <!-- ================================================================== -->
+  <!-- Delete Confirmation Modal                                            -->
+  <!-- ================================================================== -->
+  <transition name="fade">
+    <div class="overlay" v-if="showDeleteModal" @mousedown.self="showDeleteModal = false">
+      <div class="modal modal-sm">
+        <div class="modal-header">
+          <span class="modal-title">确认删除</span>
+          <button class="btn-icon" @click="showDeleteModal = false">✕</button>
+        </div>
+        <div class="modal-body">
+          <p style="margin-bottom:12px;">
+            确定要删除模板 <strong>「{{ deleteTarget && deleteTarget.name }}」</strong> 吗？
+          </p>
+          <div class="alert alert-error" style="margin-bottom:0;">
+            ⚠️ 此操作不可撤销，删除后无法恢复。
+          </div>
+          <div class="alert alert-error mt-2" v-if="deleteError">{{ deleteError }}</div>
+        </div>
+        <div class="modal-footer">
+          <button class="btn btn-ghost" @click="showDeleteModal = false" :disabled="deleteLoading">取消</button>
+          <button class="btn btn-danger" @click="confirmDelete" :disabled="deleteLoading">
+            <span class="spinner" v-if="deleteLoading"></span>
+            确认删除
+          </button>
+        </div>
+      </div>
+    </div>
+  </transition>
+
+</div><!-- /#app -->
+
+<script>
+const { createApp, ref, reactive, computed, watch, nextTick } = Vue;
+
+/* ------------------------------------------------------------------ */
+/* API helpers                                                           */
+/* ------------------------------------------------------------------ */
+const API = {
+  async list() {
+    const r = await fetch('/api/notification_template/list');
+    return r.json();
+  },
+  async create(payload) {
+    const r = await fetch('/api/notification_template/create', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+    return r.json();
+  },
+  async update(payload) {
+    const r = await fetch('/api/notification_template/update', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+    return r.json();
+  },
+  async delete(id) {
+    const r = await fetch('/api/notification_template/delete', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id }),
+    });
+    return r.json();
+  },
+  async preview(payload) {
+    const r = await fetch('/api/notification_template/preview', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+    return r.json();
+  },
+};
+
+/* ------------------------------------------------------------------ */
+/* Placeholder extraction (client-side mirror of server logic)          */
+/* ------------------------------------------------------------------ */
+const VALID_PH_RE = /\{\{\s*([A-Za-z_][A-Za-z0-9_.]*)\s*\}\}/g;
+const ANY_PH_RE   = /\{\{(.*?)\}\}/gs;
+const IDENT_RE    = /^[A-Za-z_][A-Za-z0-9_.]*$/;
+const MAX_LEN     = 64;
+
+function extractPlaceholders(body) {
+  const seen = new Set(), result = [];
+  for (const m of (body || '').matchAll(VALID_PH_RE)) {
+    if (!seen.has(m[1])) { seen.add(m[1]); result.push(m[1]); }
+  }
+  return result;
+}
+
+function validateSyntax(body) {
+  const errors = [];
+  for (const m of (body || '').matchAll(ANY_PH_RE)) {
+    const inner = m[1], raw = m[0], s = inner.trim();
+    if (!s) { errors.push(`占位符内容不能为空: '${raw}'`); continue; }
+    if (s.length > MAX_LEN) { errors.push(`占位符名称过长 (最多 ${MAX_LEN} 个字符): '${raw}'`); continue; }
+    if (s.startsWith('.') || s.endsWith('.')) { errors.push(`占位符名称不能以点号开头或结尾: '${raw}'`); continue; }
+    if (s.includes('..')) { errors.push(`占位符名称不能包含连续点号: '${raw}'`); continue; }
+    if (!IDENT_RE.test(s)) errors.push(`占位符名称无效 '${s}': 必须以字母或下划线开头，只能包含字母、数字、下划线和点`);
+  }
+  return errors;
+}
+
+/* ------------------------------------------------------------------ */
+/* Debounce utility                                                      */
+/* ------------------------------------------------------------------ */
+function debounce(fn, ms) {
+  let t; return (...args) => { clearTimeout(t); t = setTimeout(() => fn(...args), ms); };
+}
+
+/* ------------------------------------------------------------------ */
+/* Date formatter                                                        */
+/* ------------------------------------------------------------------ */
+function formatDate(ts) {
+  if (!ts) return '—';
+  return new Date(ts * 1000).toLocaleString('zh-CN', {
+    year: 'numeric', month: '2-digit', day: '2-digit',
+    hour: '2-digit', minute: '2-digit',
+  });
+}
+
+/* ------------------------------------------------------------------ */
+/* App                                                                   */
+/* ------------------------------------------------------------------ */
+createApp({
+  setup() {
+    /* ---- list state ---- */
+    const templates    = ref([]);
+    const listLoading  = ref(false);
+    const listError    = ref('');
+
+    async function loadTemplates() {
+      listLoading.value = true;
+      listError.value   = '';
+      try {
+        const res = await API.list();
+        if (res.status === 'ok') templates.value = res.data.templates || [];
+        else listError.value = res.message || '加载失败';
+      } catch (e) {
+        listError.value = '网络错误，请稍后重试';
+      } finally {
+        listLoading.value = false;
+      }
+    }
+
+    /* ---- form modal ---- */
+    const showFormModal = ref(false);
+    const isEditing     = ref(false);
+    const editingId     = ref(null);
+
+    const form = reactive({ name: '', body: '' });
+    const fieldErrors = reactive({ name: '', body: '' });
+    const formError   = ref('');
+    const formSyntaxErrors = ref([]);
+    const formSaving  = ref(false);
+
+    const detectedPlaceholders = ref([]);
+    const liveSyntaxErrors     = ref([]);
+    const previewVars          = reactive({});
+    const previewResult        = ref('');
+    const previewWarnings      = ref([]);
+
+    function resetForm() {
+      form.name = ''; form.body = '';
+      fieldErrors.name = ''; fieldErrors.body = '';
+      formError.value = ''; formSyntaxErrors.value = [];
+      detectedPlaceholders.value = [];
+      liveSyntaxErrors.value = [];
+      Object.keys(previewVars).forEach(k => delete previewVars[k]);
+      previewResult.value = '';
+      previewWarnings.value = [];
+    }
+
+    function openCreateModal() {
+      resetForm(); isEditing.value = false; editingId.value = null;
+      showFormModal.value = true;
+    }
+
+    function openEditModal(tpl) {
+      resetForm();
+      form.name = tpl.name; form.body = tpl.body;
+      isEditing.value = true; editingId.value = tpl.id;
+      detectedPlaceholders.value = extractPlaceholders(tpl.body);
+      showFormModal.value = true;
+    }
+
+    function closeFormModal() {
+      if (formSaving.value) return;
+      showFormModal.value = false;
+    }
+
+    function onBodyInput() {
+      fieldErrors.body = '';
+      detectedPlaceholders.value = extractPlaceholders(form.body);
+      liveSyntaxErrors.value = validateSyntax(form.body);
+      // Sync previewVars keys
+      const current = new Set(detectedPlaceholders.value);
+      Object.keys(previewVars).forEach(k => { if (!current.has(k)) delete previewVars[k]; });
+      detectedPlaceholders.value.forEach(p => { if (!(p in previewVars)) previewVars[p] = ''; });
+      debouncedPreview();
+    }
+
+    async function runFormPreview() {
+      if (!form.body || liveSyntaxErrors.value.length) {
+        previewResult.value = ''; previewWarnings.value = []; return;
+      }
+      try {
+        const res = await API.preview({
+          body: form.body,
+          variables: { ...previewVars },
+          missing_strategy: 'keep',
+        });
+        if (res.status === 'ok') {
+          previewResult.value  = res.data.rendered;
+          previewWarnings.value = res.data.warnings || [];
+        }
+      } catch (_) { /* silent */ }
+    }
+
+    const debouncedPreview = debounce(runFormPreview, 350);
+
+    async function saveTemplate() {
+      // Client-side validation
+      let valid = true;
+      if (!form.name.trim()) { fieldErrors.name = '模板名称不能为空'; valid = false; }
+      if (!form.body.trim()) { fieldErrors.body = '模板正文不能为空'; valid = false; }
+      if (liveSyntaxErrors.value.length) { valid = false; }
+      if (!valid) return;
+
+      formSaving.value = true; formError.value = ''; formSyntaxErrors.value = [];
+      try {
+        let res;
+        if (isEditing.value) {
+          res = await API.update({ id: editingId.value, name: form.name.trim(), body: form.body });
+        } else {
+          res = await API.create({ name: form.name.trim(), body: form.body });
+        }
+        if (res.status === 'ok') {
+          showFormModal.value = false;
+          await loadTemplates();
+        } else {
+          formError.value = res.message || '操作失败';
+          formSyntaxErrors.value = res.data?.syntax_errors || [];
+        }
+      } catch (e) {
+        formError.value = '网络错误，请稍后重试';
+      } finally {
+        formSaving.value = false;
+      }
+    }
+
+    /* ---- preview modal (from list) ---- */
+    const showPreviewModal = ref(false);
+    const previewTpl       = ref(null);
+    const pvVars           = reactive({});
+    const pvMissingStrategy = ref('keep');
+    const pvRendered       = ref('');
+    const pvWarnings       = ref([]);
+    const pvLoading        = ref(false);
+    const pvError          = ref('');
+
+    function openPreviewModal(tpl) {
+      previewTpl.value = tpl;
+      Object.keys(pvVars).forEach(k => delete pvVars[k]);
+      (tpl.placeholders || []).forEach(p => { pvVars[p] = ''; });
+      pvMissingStrategy.value = 'keep';
+      pvRendered.value = ''; pvWarnings.value = []; pvError.value = '';
+      showPreviewModal.value = true;
+      nextTick(runPreview);
+    }
+
+    async function runPreview() {
+      if (!previewTpl.value) return;
+      pvLoading.value = true; pvError.value = '';
+      try {
+        const res = await API.preview({
+          id: previewTpl.value.id,
+          variables: { ...pvVars },
+          missing_strategy: pvMissingStrategy.value,
+        });
+        if (res.status === 'ok') {
+          pvRendered.value = res.data.rendered;
+          pvWarnings.value = res.data.warnings || [];
+        } else {
+          pvError.value = res.message || '预览失败';
+          if (pvMissingStrategy.value === 'error' && res.message) {
+            pvError.value = res.message;
+          }
+        }
+      } catch (_) {
+        pvError.value = '网络错误';
+      } finally {
+        pvLoading.value = false;
+      }
+    }
+
+    const debouncedRunPreview = debounce(runPreview, 350);
+
+    function openEditFromPreview() {
+      showPreviewModal.value = false;
+      nextTick(() => openEditModal(previewTpl.value));
+    }
+
+    /* ---- delete modal ---- */
+    const showDeleteModal = ref(false);
+    const deleteTarget    = ref(null);
+    const deleteLoading   = ref(false);
+    const deleteError     = ref('');
+
+    function openDeleteModal(tpl) {
+      deleteTarget.value = tpl; deleteError.value = '';
+      showDeleteModal.value = true;
+    }
+
+    async function confirmDelete() {
+      if (!deleteTarget.value) return;
+      deleteLoading.value = true; deleteError.value = '';
+      try {
+        const res = await API.delete(deleteTarget.value.id);
+        if (res.status === 'ok') {
+          showDeleteModal.value = false;
+          await loadTemplates();
+        } else {
+          deleteError.value = res.message || '删除失败';
+        }
+      } catch (_) {
+        deleteError.value = '网络错误，请稍后重试';
+      } finally {
+        deleteLoading.value = false;
+      }
+    }
+
+    /* ---- init ---- */
+    loadTemplates();
+
+    return {
+      /* list */
+      templates, listLoading, listError, loadTemplates, formatDate,
+      /* form modal */
+      showFormModal, isEditing, form, fieldErrors,
+      formError, formSyntaxErrors, formSaving,
+      detectedPlaceholders, liveSyntaxErrors,
+      previewVars, previewResult, previewWarnings,
+      openCreateModal, openEditModal, closeFormModal,
+      onBodyInput, debouncedPreview, saveTemplate,
+      /* preview modal */
+      showPreviewModal, previewTpl,
+      pvVars, pvMissingStrategy, pvRendered, pvWarnings, pvLoading, pvError,
+      openPreviewModal, runPreview, debouncedRunPreview, openEditFromPreview,
+      /* delete modal */
+      showDeleteModal, deleteTarget, deleteLoading, deleteError,
+      openDeleteModal, confirmDelete,
+    };
+  },
+}).mount('#app');
+</script>
+</body>
+</html>
