@@ -115,7 +115,7 @@ class AstrBotDashboard:
     async def auth_middleware(self):
         if not request.path.startswith("/api"):
             return
-        allowed_endpoints = ["/api/auth/login", "/api/file"]
+        allowed_endpoints = ["/api/auth/login", "/api/file", "/api/templates"]
         if any(request.path.startswith(prefix) for prefix in allowed_endpoints):
             return
         token = request.headers.get("Authorization")
