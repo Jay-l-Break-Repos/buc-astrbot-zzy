@@ -15,6 +15,8 @@ services:
         RUN mkdir -p /app/data/config /app/data/plugins /app/data/temp
         RUN curl -L -o /app/data/dashboard.zip "https://astrbot-registry.soulter.top/download/astrbot-dashboard/latest/dist.zip" \
             && cd /app/data && unzip -q dashboard.zip && rm dashboard.zip
+        # Copy our overlay files on top of the cloned AstrBot
+        COPY astrbot/ /app/astrbot/
         EXPOSE 6185
         CMD ["python", "main.py"]
     ports:
