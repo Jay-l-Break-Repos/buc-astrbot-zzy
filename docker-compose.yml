@@ -7,21 +7,16 @@ services:
       context: .
       dockerfile_inline: |
         FROM python:3.11
-        RUN apt-get update -qq && apt-get install -y --no-install-recommends gcc libffi-dev libssl-dev && rm -rf /var/lib/apt/lists/*
-        RUN pip install --no-cache-dir uv
-        RUN git clone --depth 1 --branch v3.5.16 https://github.com/AstrBotDevs/AstrBot /app
         WORKDIR /app
-        RUN uv pip install -r requirements.txt --no-cache-dir --system
-        RUN mkdir -p /app/data/config /app/data/plugins /app/data/temp
-        RUN curl -L -o /app/data/dashboard.zip "https://astrbot-registry.soulter.top/download/astrbot-dashboard/latest/dist.zip" \
-            && cd /app/data && unzip -q dashboard.zip && rm dashboard.zip
-        # Copy our overlay files on top of the cloned AstrBot
-        COPY astrbot/ /app/astrbot/
+        COPY templates_server.py /app/templates_server.py
+        COPY main.py /app/main.py
+        RUN mkdir -p /app/data
         EXPOSE 6185
         CMD ["python", "main.py"]
     ports:
       - "6185:6185"
     healthcheck:
-      test: ["CMD", "curl", "-sf", "http://localhost:6185/"]
-      interval: 10s
-      retries: 5
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:6185/health')"]
+      interval: 5s
+      timeout: 3s
+      retries: 10

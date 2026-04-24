@@ -30,14 +30,18 @@ from http import HTTPStatus
 # Configuration
 # ---------------------------------------------------------------------------
 PORT = int(os.environ.get("TEMPLATES_PORT", "6185"))
-DB_PATH = os.environ.get("TEMPLATES_DB", "/app/data/templates.db")
+# Use a writable path that works both in Docker (/app/data) and locally (/tmp)
+_default_db = "/app/data/templates.db" if os.path.isdir("/app/data") else "/tmp/templates.db"
+DB_PATH = os.environ.get("TEMPLATES_DB", _default_db)
 
 # ---------------------------------------------------------------------------
 # Database helpers
 # ---------------------------------------------------------------------------
 
 def _get_db():
-    os.makedirs(os.path.dirname(DB_PATH), exist_ok=True)
+    db_dir = os.path.dirname(DB_PATH)
+    if db_dir:
+        os.makedirs(db_dir, exist_ok=True)
     conn = sqlite3.connect(DB_PATH)
     conn.row_factory = sqlite3.Row
     conn.execute("""
@@ -415,9 +419,11 @@ class TemplateHandler(http.server.BaseHTTPRequestHandler):
 # Entry point
 # ---------------------------------------------------------------------------
 
-if __name__ == "__main__":
-    # Ensure DB directory exists
-    os.makedirs(os.path.dirname(DB_PATH), exist_ok=True)
+def main():
+    """Start the templates API server. Called from main.py or directly."""
+    db_dir = os.path.dirname(DB_PATH)
+    if db_dir:
+        os.makedirs(db_dir, exist_ok=True)
 
     server = http.server.ThreadingHTTPServer(("0.0.0.0", PORT), TemplateHandler)
     print(f"[templates_server] Listening on 0.0.0.0:{PORT}", flush=True)
@@ -426,3 +432,7 @@ if __name__ == "__main__":
         server.serve_forever()
     except KeyboardInterrupt:
         print("[templates_server] Shutting down", flush=True)
+
+
+if __name__ == "__main__":
+    main()
