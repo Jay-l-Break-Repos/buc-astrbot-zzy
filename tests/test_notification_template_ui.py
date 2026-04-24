@@ -61,7 +61,7 @@ class TestHTMLStructure:
         assert html_content.strip().lower().startswith("<!doctype html")
 
     def test_has_charset_utf8(self, html_content):
-        assert 'charset="UTF-8"' in html_content or "charset='UTF-8'" in html_content or "charset" in html_content.lower()
+        assert "charset" in html_content.lower()
 
     def test_has_viewport_meta(self, html_content):
         assert "viewport" in html_content
@@ -216,24 +216,31 @@ class TestDeleteModal:
 
 
 # ===========================================================================
-# JavaScript API calls
+# JavaScript API calls  (new RESTful /api/templates endpoints)
 # ===========================================================================
 
 class TestJavaScriptAPI:
     def test_has_api_list(self, html_content):
-        assert "/api/notification_template/list" in html_content
+        assert "/api/templates" in html_content
 
     def test_has_api_create(self, html_content):
-        assert "/api/notification_template/create" in html_content
+        # POST /api/templates
+        assert "/api/templates" in html_content
+        assert "method: 'POST'" in html_content
 
     def test_has_api_update(self, html_content):
-        assert "/api/notification_template/update" in html_content
+        # PUT /api/templates/:id
+        assert "/api/templates/" in html_content
+        assert "'PUT'" in html_content
 
     def test_has_api_delete(self, html_content):
-        assert "/api/notification_template/delete" in html_content
+        # DELETE /api/templates/:id
+        assert "/api/templates/" in html_content
+        assert "'DELETE'" in html_content
 
     def test_has_api_preview(self, html_content):
-        assert "/api/notification_template/preview" in html_content
+        # POST /api/templates/:id/preview
+        assert "/preview" in html_content
 
     def test_api_uses_post_for_mutations(self, html_content):
         assert "method: 'POST'" in html_content

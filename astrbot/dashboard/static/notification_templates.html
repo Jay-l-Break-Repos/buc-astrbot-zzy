@@ -318,7 +318,10 @@
                 required
                 :disabled="formSaving"
               ></textarea>
-              <p class="hint">使用 <code>{{ '{{ variable }}' }}</code> 语法插入占位符，例如 <code>{{ '{{ username }}' }}</code></p>
+              <p class="hint">
+                使用 <code>{{ '{{ variable }}' }}</code> 插入占位符，支持 Jinja2 过滤器，例如
+                <code>{{ '{{ username|upper }}' }}</code>、<code>{{ '{{ count|default("0") }}' }}</code>
+              </p>
             </div>
 
             <!-- Live syntax errors -->
@@ -481,9 +484,11 @@
 
 const MAX_LEN = 64;
 
-/** Extract unique, valid placeholder names from a template body. */
+/** Extract unique, valid placeholder names from a template body.
+ *  Supports filter syntax: {{ name|upper }} → 'name'
+ */
 function extractPlaceholders(body) {
-  const re = /\{\{\s*([A-Za-z_][A-Za-z0-9_.]*)\s*\}\}/g;
+  const re = /\{\{\s*([A-Za-z_][A-Za-z0-9_.]*)(?:\s*\|[^}]*)?\s*\}\}/g;
   const seen = new Set();
   const result = [];
   let m;
@@ -503,10 +508,12 @@ function validateSyntax(body) {
     const raw = m[0];
     const inner = m[1].trim();
     if (!inner) { errors.push(`占位符内容不能为空: '${raw}'`); continue; }
-    if (inner.length > MAX_LEN) { errors.push(`占位符名称过长 (最多 ${MAX_LEN} 个字符): '${raw}'`); continue; }
-    if (inner.startsWith('.') || inner.endsWith('.')) { errors.push(`占位符名称不能以点号开头或结尾: '${raw}'`); continue; }
-    if (inner.includes('..')) { errors.push(`占位符名称不能包含连续点号 (..): '${raw}'`); continue; }
-    if (!identRe.test(inner)) { errors.push(`占位符名称无效 '${inner}': 必须以字母或下划线开头，只能包含字母、数字、下划线和点`); continue; }
+    // Strip filter part for validation
+    const varPart = inner.split('|')[0].trim();
+    if (varPart.length > MAX_LEN) { errors.push(`占位符名称过长 (最多 ${MAX_LEN} 个字符): '${raw}'`); continue; }
+    if (varPart.startsWith('.') || varPart.endsWith('.')) { errors.push(`占位符名称不能以点号开头或结尾: '${raw}'`); continue; }
+    if (varPart.includes('..')) { errors.push(`占位符名称不能包含连续点号 (..): '${raw}'`); continue; }
+    if (!identRe.test(varPart)) { errors.push(`占位符名称无效 '${varPart}': 必须以字母或下划线开头，只能包含字母、数字、下划线和点`); continue; }
   }
   return errors;
 }
@@ -535,13 +542,11 @@ createApp({
       listLoading.value = true;
       listError.value   = null;
       try {
-        const res  = await fetch('/api/notification_template/list');
+        const res  = await fetch('/api/templates');
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
         const json = await res.json();
-        if (json.status === 'ok') {
-          templates.value = json.data.templates || [];
-        } else {
-          listError.value = json.message || '未知错误';
-        }
+        // New API returns array directly
+        templates.value = Array.isArray(json) ? json : (json.templates || []);
       } catch (e) {
         listError.value = e.message;
       } finally {
@@ -574,7 +579,6 @@ createApp({
     function onBodyInput() {
       liveSyntaxErrors.value    = validateSyntax(form.body);
       detectedPlaceholders.value = extractPlaceholders(form.body);
-      // Reset preview vars for new placeholders
       for (const ph of detectedPlaceholders.value) {
         if (!(ph in previewVars)) previewVars[ph] = '';
       }
@@ -617,24 +621,28 @@ createApp({
 
       formSaving.value = true;
       try {
-        const url     = isEditing.value
-          ? '/api/notification_template/update'
-          : '/api/notification_template/create';
-        const payload = isEditing.value
-          ? { id: editingId.value, name: form.name.trim(), body: form.body }
-          : { name: form.name.trim(), body: form.body };
-
-        const res  = await fetch(url, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(payload),
-        });
+        let res;
+        if (isEditing.value) {
+          // PUT /api/templates/:id
+          res = await fetch(`/api/templates/${editingId.value}`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ name: form.name.trim(), body: form.body }),
+          });
+        } else {
+          // POST /api/templates
+          res = await fetch('/api/templates', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ name: form.name.trim(), body: form.body }),
+          });
+        }
         const json = await res.json();
-        if (json.status === 'ok') {
+        if (res.ok) {
           showFormModal.value = false;
           await loadTemplates();
         } else {
-          formError.value = json.message || '操作失败';
+          formError.value = json.error || '操作失败';
         }
       } catch (e) {
         formError.value = e.message;
@@ -669,21 +677,21 @@ createApp({
       pvRendered.value = null;
       pvWarnings.value = [];
       try {
-        const res  = await fetch('/api/notification_template/preview', {
+        // POST /api/templates/:id/preview
+        const res  = await fetch(`/api/templates/${previewTpl.value.id}/preview`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
-            id: previewTpl.value.id,
             variables: { ...pvVars },
             missing_strategy: pvMissingStrategy.value,
           }),
         });
         const json = await res.json();
-        if (json.status === 'ok') {
-          pvRendered.value = json.data.rendered;
-          pvWarnings.value = json.data.warnings || [];
+        if (res.ok) {
+          pvRendered.value = json.rendered;
+          pvWarnings.value = json.warnings || [];
         } else {
-          pvWarnings.value = [json.message || '渲染失败'];
+          pvWarnings.value = [json.error || '渲染失败'];
         }
       } catch (e) {
         pvWarnings.value = [e.message];
@@ -714,17 +722,17 @@ createApp({
       deleteError.value   = null;
       deleteLoading.value = true;
       try {
-        const res  = await fetch('/api/notification_template/delete', {
-          method: 'POST',
+        // DELETE /api/templates/:id
+        const res  = await fetch(`/api/templates/${deleteTarget.value.id}`, {
+          method: 'DELETE',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ id: deleteTarget.value.id }),
         });
         const json = await res.json();
-        if (json.status === 'ok') {
+        if (res.ok) {
           showDeleteModal.value = false;
           await loadTemplates();
         } else {
-          deleteError.value = json.message || '删除失败';
+          deleteError.value = json.error || '删除失败';
         }
       } catch (e) {
         deleteError.value = e.message;
